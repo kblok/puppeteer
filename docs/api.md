@@ -1,6 +1,6 @@
-##### Released API: [v1.0.0](https://github.com/GoogleChrome/puppeteer/blob/v1.0.0/docs/api.md) | [v0.13.0](https://github.com/GoogleChrome/puppeteer/blob/v0.13.0/docs/api.md) | [v0.12.0](https://github.com/GoogleChrome/puppeteer/blob/v0.12.0/docs/api.md) | [v0.11.0](https://github.com/GoogleChrome/puppeteer/blob/v0.11.0/docs/api.md) | [v0.10.2](https://github.com/GoogleChrome/puppeteer/blob/v0.10.2/docs/api.md) | [v0.10.1](https://github.com/GoogleChrome/puppeteer/blob/v0.10.1/docs/api.md) | [v0.10.0](https://github.com/GoogleChrome/puppeteer/blob/v0.10.0/docs/api.md) | [v0.9.0](https://github.com/GoogleChrome/puppeteer/blob/v0.9.0/docs/api.md)
+##### Released APIs: [v1.1.1](https://github.com/GoogleChrome/puppeteer/blob/v1.1.1/docs/api.md) | [v1.1.0](https://github.com/GoogleChrome/puppeteer/blob/v1.1.0/docs/api.md) | [v1.0.0](https://github.com/GoogleChrome/puppeteer/blob/v1.0.0/docs/api.md) | [v0.13.0](https://github.com/GoogleChrome/puppeteer/blob/v0.13.0/docs/api.md) | [v0.12.0](https://github.com/GoogleChrome/puppeteer/blob/v0.12.0/docs/api.md) | [v0.11.0](https://github.com/GoogleChrome/puppeteer/blob/v0.11.0/docs/api.md) | [v0.10.2](https://github.com/GoogleChrome/puppeteer/blob/v0.10.2/docs/api.md) | [v0.10.1](https://github.com/GoogleChrome/puppeteer/blob/v0.10.1/docs/api.md) | [v0.10.0](https://github.com/GoogleChrome/puppeteer/blob/v0.10.0/docs/api.md) | [v0.9.0](https://github.com/GoogleChrome/puppeteer/blob/v0.9.0/docs/api.md)
 
-# Puppeteer API v<!-- GEN:version -->1.1.0<!-- GEN:stop-->
+# Puppeteer API v<!-- GEN:version -->1.2.0<!-- GEN:stop-->
 
 ##### Table of Contents
 
@@ -183,6 +183,7 @@
   * [elementHandle.asElement()](#elementhandleaselement)
   * [elementHandle.boundingBox()](#elementhandleboundingbox)
   * [elementHandle.click([options])](#elementhandleclickoptions)
+  * [elementHandle.contentFrame()](#elementhandlecontentframe)
   * [elementHandle.dispose()](#elementhandledispose)
   * [elementHandle.executionContext()](#elementhandleexecutioncontext)
   * [elementHandle.focus()](#elementhandlefocus)
@@ -204,6 +205,7 @@
   * [request.headers()](#requestheaders)
   * [request.method()](#requestmethod)
   * [request.postData()](#requestpostdata)
+  * [request.redirectChain()](#requestredirectchain)
   * [request.resourceType()](#requestresourcetype)
   * [request.respond(response)](#requestrespondresponse)
   * [request.response()](#requestresponse)
@@ -497,11 +499,22 @@ puppeteer.launch().then(async browser => {
 });
 ```
 
-The Page class emits various events (described below) which can be handled using any of Node's native [`EventEmitter`](https://nodejs.org/api/events.html#events_class_eventemitter) methods, such as `on` or `once`.
+The Page class emits various events (described below) which can be handled using any of Node's native [`EventEmitter`](https://nodejs.org/api/events.html#events_class_eventemitter) methods, such as `on`, `once` or `removeListener`.
 
 This example logs a message for a single page `load` event:
 ```js
 page.once('load', () => console.log('Page loaded!'));
+```
+
+To unsubscribe from events use the `removeListener` method:
+
+```js
+function logRequest(interceptedRequest) {
+  console.log('A request was made:', interceptedRequest.url());
+}
+page.on('request', logRequest);
+// Sometime later...
+page.removeListener('request', logRequest);
 ```
 
 #### event: 'console'
@@ -653,6 +666,7 @@ Shortcut for [page.mainFrame().$x(expression)](#frameexpression)
   - `url` <[string]> URL of a script to be added.
   - `path` <[string]> Path to the JavaScript file to be injected into frame. If `path` is a relative path, then it is resolved relative to [current working directory](https://nodejs.org/api/process.html#process_process_cwd).
   - `content` <[string]> Raw JavaScript content to be injected into frame.
+  - `type` <[string]> Script type. Use 'module' in order to load a Javascript ES6 module. See [script](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script) for more details.
 - returns: <[Promise]<[ElementHandle]>> which resolves to the added tag when the script's onload fires or when the script content was injected into frame.
 
 Adds a `<script>` tag into the page with the desired url or content.
@@ -786,13 +800,13 @@ List of all available devices is available in the source code: [DeviceDescriptor
 #### page.evaluate(pageFunction, ...args)
 - `pageFunction` <[function]|[string]> Function to be evaluated in the page context
 - `...args` <...[Serializable]|[JSHandle]> Arguments to pass to `pageFunction`
-- returns: <[Promise]<[Serializable]>> Resolves to the return value of `pageFunction`
+- returns: <[Promise]<[Serializable]>> Promise which resolves to the return value of `pageFunction`
 
-If the function, passed to the `page.evaluate`, returns a [Promise], then `page.evaluate` would wait for the promise to resolve and return its value.
+If the function passed to the `page.evaluate` returns a [Promise], then `page.evaluate` would wait for the promise to resolve and return its value.
 
-If the function passed into `page.evaluate` returns a non-[Serializable] value, then `page.evaluate` resolves to `undefined`.
-Passing arguments to ```pageFunction```.
+If the function passed to the `page.evaluate` returns a non-[Serializable] value, then `page.evaluate` resolves to `undefined`.
 
+Passing arguments to `pageFunction`:
 ```js
 const result = await page.evaluate(x => {
   return Promise.resolve(8 * x);
@@ -800,8 +814,7 @@ const result = await page.evaluate(x => {
 console.log(result); // prints "56"
 ```
 
-A string can also be passed in instead of a function.
-
+A string can also be passed in instead of a function:
 ```js
 console.log(await page.evaluate('1 + 2')); // prints "3"
 const x = 10;
@@ -820,19 +833,15 @@ Shortcut for [page.mainFrame().evaluate(pageFunction, ...args)](#frameevaluatepa
 #### page.evaluateHandle(pageFunction, ...args)
 - `pageFunction` <[function]|[string]> Function to be evaluated in the page context
 - `...args` <...[Serializable]|[JSHandle]> Arguments to pass to `pageFunction`
-- returns: <[Promise]<[JSHandle]>> Resolves to the return value of `pageFunction`
+- returns: <[Promise]<[JSHandle]>> Promise which resolves to the return value of `pageFunction` as in-page object (JSHandle)
 
-If the function, passed to the `page.evaluateHandle`, returns a [Promise], then `page.evaluateHandle` would wait for the promise to resolve and return its value.
+The only difference between `page.evaluate` and `page.evaluateHandle` is that `page.evaluateHandle` returns in-page object (JSHandle).
 
+If the function passed to the `page.evaluateHandle` returns a [Promise], then `page.evaluateHandle` would wait for the promise to resolve and return its value.
+
+A string can also be passed in instead of a function:
 ```js
-const aWindowHandle = await page.evaluateHandle(() => Promise.resolve(window));
-aWindowHandle; // Handle for the window object.
-```
-
-A string can also be passed in instead of a function.
-
-```js
-const aHandle = await page.evaluateHandle('document'); // Handle for the 'document'.
+const aHandle = await page.evaluateHandle('document'); // Handle for the 'document'
 ```
 
 [JSHandle] instances can be passed as arguments to the `page.evaluateHandle`:
@@ -865,7 +874,7 @@ An example of overriding the navigator.languages property before the page loads:
 Object.defineProperty(navigator, "languages", {
   get: function() {
     return ["en-US", "en", "bn"];
-  };
+  }
 });
 
 // In your puppeteer script, assuming the preload.js file is in same folder of our script
@@ -1338,7 +1347,7 @@ const puppeteer = require('puppeteer');
 puppeteer.launch().then(async browser => {
   const page = await browser.newPage();
   const watchDog = page.waitForFunction('window.innerWidth < 100');
-  page.setViewport({width: 50, height: 50});
+  await page.setViewport({width: 50, height: 50});
   await watchDog;
   await browser.close();
 });
@@ -1708,6 +1717,7 @@ The method evaluates the XPath expression.
   - `url` <[string]> URL of a script to be added.
   - `path` <[string]> Path to the JavaScript file to be injected into frame. If `path` is a relative path, then it is resolved relative to [current working directory](https://nodejs.org/api/process.html#process_process_cwd).
   - `content` <[string]> Raw JavaScript content to be injected into frame.
+  - `type` <[string]> Script type. Use 'module' in order to load a Javascript ES6 module. See [script](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script) for more details.
 - returns: <[Promise]<[ElementHandle]>> which resolves to the added tag when the script's onload fires or when the script content was injected into frame.
 
 Adds a `<script>` tag into the page with the desired url or content.
@@ -1752,11 +1762,11 @@ Gets the full HTML contents of the frame, including the doctype.
 #### frame.evaluate(pageFunction, ...args)
 - `pageFunction` <[function]|[string]> Function to be evaluated in browser context
 - `...args` <...[Serializable]|[JSHandle]> Arguments to pass to  `pageFunction`
-- returns: <[Promise]<[Serializable]>> Promise which resolves to function return value
+- returns: <[Promise]<[Serializable]>> Promise which resolves to the return value of `pageFunction`
 
-If the function, passed to the `frame.evaluate`, returns a [Promise], then `frame.evaluate` would wait for the promise to resolve and return its value.
+If the function passed to the `frame.evaluate` returns a [Promise], then `frame.evaluate` would wait for the promise to resolve and return its value.
 
-If the function passed into `frame.evaluate` returns a non-[Serializable] value, then `frame.evaluate` resolves to `undefined`.
+If the function passed to the `frame.evaluate` returns a non-[Serializable] value, then `frame.evaluate` resolves to `undefined`.
 
 ```js
 const result = await frame.evaluate(() => {
@@ -1781,7 +1791,9 @@ await bodyHandle.dispose();
 #### frame.evaluateHandle(pageFunction, ...args)
 - `pageFunction` <[function]|[string]> Function to be evaluated in the page context
 - `...args` <...[Serializable]|[JSHandle]> Arguments to pass to `pageFunction`
-- returns: <[Promise]<[JSHandle]>> Resolves to the return value of `pageFunction`
+- returns: <[Promise]<[JSHandle]>> Promise which resolves to the return value of `pageFunction` as in-page object (JSHandle)
+
+The only difference between `frame.evaluate` and `frame.evaluateHandle` is that `frame.evaluateHandle` returns in-page object (JSHandle).
 
 If the function, passed to the `frame.evaluateHandle`, returns a [Promise], then `frame.evaluateHandle` would wait for the promise to resolve and return its value.
 
@@ -1988,9 +2000,9 @@ The class represents a context for JavaScript execution. Examples of JavaScript 
 #### executionContext.evaluate(pageFunction, ...args)
 - `pageFunction` <[function]|[string]> Function to be evaluated in `executionContext`
 - `...args` <...[Serializable]|[JSHandle]> Arguments to pass to `pageFunction`
-- returns: <[Promise]<[Serializable]>> Promise which resolves to function return value
+- returns: <[Promise]<[Serializable]>> Promise which resolves to the return value of `pageFunction`
 
-If the function, passed to the `executionContext.evaluate`, returns a [Promise], then `executionContext.evaluate` would wait for the promise to resolve and return its value.
+If the function passed to the `executionContext.evaluate` returns a [Promise], then `executionContext.evaluate` would wait for the promise to resolve and return its value.
 
 ```js
 const executionContext = await page.mainFrame().executionContext();
@@ -2017,9 +2029,11 @@ console.log(result); // prints '3'.
 #### executionContext.evaluateHandle(pageFunction, ...args)
 - `pageFunction` <[function]|[string]> Function to be evaluated in the `executionContext`
 - `...args` <...[Serializable]|[JSHandle]> Arguments to pass to `pageFunction`
-- returns: <[Promise]<[JSHandle]>> Resolves to the return value of `pageFunction`
+- returns: <[Promise]<[JSHandle]>> Promise which resolves to the return value of `pageFunction` as in-page object (JSHandle)
 
-If the function, passed to the `executionContext.evaluateHandle`, returns a [Promise], then `executionContext.evaluteHandle` would wait for the promise to resolve and return its value.
+The only difference between `executionContext.evaluate` and `executionContext.evaluateHandle` is that `executionContext.evaluateHandle` returns in-page object (JSHandle).
+
+If the function passed to the `executionContext.evaluateHandle` returns a [Promise], then `executionContext.evaluateHandle` would wait for the promise to resolve and return its value.
 
 ```js
 const context = await page.mainFrame().executionContext();
@@ -2183,6 +2197,9 @@ This method returns the bounding box of the element (relative to the main frame)
 
 This method scrolls element into view if needed, and then uses [page.mouse](#pagemouse) to click in the center of the element.
 If the element is detached from DOM, the method throws an error.
+
+#### elementHandle.contentFrame()
+- returns: <[Promise]<?[Frame]>> Resolves to the content frame for element handles referencing iframe nodes, or null otherwise
 
 #### elementHandle.dispose()
 - returns: <[Promise]> Promise which resolves when the element handle is successfully disposed.
@@ -2359,6 +2376,33 @@ page.on('requestfailed', request => {
 
 #### request.postData()
 - returns: <[string]> Request's post body, if any.
+
+#### request.redirectChain()
+- returns: <[Array]<[Request]>>
+
+A `redirectChain` is a chain of requests initiated to fetch a resource.
+- If there are no redirects and the request was successful, the chain will be empty.
+- If a server responds with at least a single redirect, then the chain will
+contain all the requests that were redirected.
+
+`redirectChain` is shared between all the requests of the same chain.
+
+For example, if the website `http://example.com` has a single redirect to
+`https://example.com`, then the chain will contain one request:
+
+```js
+const response = await page.goto('http://example.com');
+const chain = response.request().redirectChain();
+console.log(chain.length); // 1
+console.log(chain[0].url()); // 'http://example.com'
+```
+
+If the website `https://google.com` has no redirects, then the chain will be empty:
+```js
+const response = await page.goto('https://google.com');
+const chain = response.request().redirectChain();
+console.log(chain.length); // 0
+```
 
 #### request.resourceType()
 - returns: <[string]>
@@ -2550,6 +2594,9 @@ for (const entry of coverage) {
 }
 console.log(`Bytes used: ${usedBytes / totalBytes * 100}%`);
 ```
+
+_To output coverage in a form consumable by [Istanbul](https://github.com/istanbuljs),
+  see [puppeteer-to-istanbul](https://github.com/istanbuljs/puppeteer-to-istanbul)._
 
 #### coverage.startCSSCoverage(options)
 - `options` <[Object]>  Set of configurable options for coverage

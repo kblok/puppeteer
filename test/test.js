@@ -271,6 +271,39 @@ describe('Puppeteer', function() {
       const args = puppeteer.defaultArgs();
       expect(args).toContain('--no-first-run');
     });
+    it('should dump browser process stderr', async({server}) => {
+      const dumpioTextToLog = 'MAGIC_DUMPIO_TEST';
+      let dumpioData = '';
+      const {spawn} = require('child_process');
+      const options = Object.assign({dumpio: true}, defaultBrowserOptions);
+      const res = spawn('node',
+          [path.join(__dirname, 'fixtures', 'dumpio.js'), PROJECT_ROOT, JSON.stringify(options), server.EMPTY_PAGE, dumpioTextToLog]);
+      res.stderr.on('data', data => dumpioData += data.toString('utf8'));
+      await new Promise(resolve => res.on('close', resolve));
+
+      expect(dumpioData).toContain(dumpioTextToLog);
+    });
+    it('should close the browser when the node process closes', async({ server }) => {
+      const {spawn, execSync} = require('child_process');
+      const res = spawn('node', [path.join(__dirname, 'fixtures', 'closeme.js'), PROJECT_ROOT, JSON.stringify(defaultBrowserOptions)]);
+      let wsEndPointCallback;
+      const wsEndPointPromise = new Promise(x => wsEndPointCallback = x);
+      let output = '';
+      res.stdout.on('data', data => {
+        output += data;
+        if (output.indexOf('\n'))
+          wsEndPointCallback(output.substring(0, output.indexOf('\n')));
+      });
+      const browser = await puppeteer.connect({ browserWSEndpoint: await wsEndPointPromise });
+      const promises = [
+        new Promise(resolve => browser.once('disconnected', resolve)),
+        new Promise(resolve => res.on('close', resolve))];
+      if (process.platform === 'win32')
+        execSync(`taskkill /pid ${res.pid} /T /F`);
+      else
+        process.kill(res.pid);
+      await Promise.all(promises);
+    });
   });
   describe('Puppeteer.connect', function() {
     it('should be able to connect multiple times to the same browser', async({server}) => {
@@ -390,6 +423,12 @@ describe('Page', function() {
       await neverResolves.catch(e => error = e);
       expect(error.message).toContain('Protocol error');
     });
+    it('should not be visible in browser.pages', async({browser}) => {
+      const newPage = await browser.newPage();
+      expect(await browser.pages()).toContain(newPage);
+      await newPage.close();
+      expect(await browser.pages()).not.toContain(newPage);
+    });
   });
 
   describe('Page.Events.error', function() {
@@ -406,6 +445,16 @@ describe('Page', function() {
     it('should work', async({page, server}) => {
       const result = await page.evaluate(() => 7 * 3);
       expect(result).toBe(21);
+    });
+    it('should throw when evaluation triggers reload', async({page, server}) => {
+      let error = null;
+      await page.evaluate(() => {
+        location.reload();
+        return new Promise(resolve => {
+          setTimeout(() => resolve(1), 0);
+        });
+      }).catch(e => error = e);
+      expect(error.message).toContain('Protocol error');
     });
     it('should await promise', async({page, server}) => {
       const result = await page.evaluate(() => Promise.resolve(8 * 7));
@@ -466,6 +515,15 @@ describe('Page', function() {
     });
     it('should fail for window object', async({page, server}) => {
       const result = await page.evaluate(() => window);
+      expect(result).toBe(undefined);
+    });
+    it('should fail for circular object', async({page, server}) => {
+      const result = await page.evaluate(() => {
+        const a = {};
+        const b = {a};
+        a.b = b;
+        return a;
+      });
       expect(result).toBe(undefined);
     });
     it('should accept a string', async({page, server}) => {
@@ -794,30 +852,20 @@ describe('Page', function() {
     it('should immediately resolve promise if node exists', async({page, server}) => {
       await page.goto(server.EMPTY_PAGE);
       const frame = page.mainFrame();
-      let added = false;
-      await frame.waitForSelector('*').then(() => added = true);
-      expect(added).toBe(true);
-
-      added = false;
+      await frame.waitForSelector('*');
       await frame.evaluate(addElement, 'div');
-      await frame.waitForSelector('div').then(() => added = true);
-      expect(added).toBe(true);
+      await frame.waitForSelector('div');
     });
 
     it('should resolve promise when node is added', async({page, server}) => {
       await page.goto(server.EMPTY_PAGE);
       const frame = page.mainFrame();
-      let added = false;
-      const watchdog = frame.waitForSelector('div').then(() => added = true);
-      // run nop function..
-      await frame.evaluate(() => 42);
-      // .. to be sure that waitForSelector promise is not resolved yet.
-      expect(added).toBe(false);
+      const watchdog = frame.waitForSelector('div');
       await frame.evaluate(addElement, 'br');
-      expect(added).toBe(false);
       await frame.evaluate(addElement, 'div');
-      await watchdog;
-      expect(added).toBe(true);
+      const eHandle = await watchdog;
+      const tagName = await eHandle.getProperty('tagName').then(e => e.jsonValue());
+      expect(tagName).toBe('DIV');
     });
 
     it('should work when node is added through innerHTML', async({page, server}) => {
@@ -832,12 +880,11 @@ describe('Page', function() {
       await page.goto(server.EMPTY_PAGE);
       await FrameUtils.attachFrame(page, 'frame1', server.EMPTY_PAGE);
       const otherFrame = page.frames()[1];
-      let added = false;
-      page.waitForSelector('div').then(() => added = true);
+      const watchdog = page.waitForSelector('div');
       await otherFrame.evaluate(addElement, 'div');
-      expect(added).toBe(false);
       await page.evaluate(addElement, 'div');
-      expect(added).toBe(true);
+      const eHandle = await watchdog;
+      expect(eHandle.executionContext().frame()).toBe(page.mainFrame());
     });
 
     it('should run in specified frame', async({page, server}) => {
@@ -845,13 +892,11 @@ describe('Page', function() {
       await FrameUtils.attachFrame(page, 'frame2', server.EMPTY_PAGE);
       const frame1 = page.frames()[1];
       const frame2 = page.frames()[2];
-      let added = false;
-      const waitForSelectorPromise = frame2.waitForSelector('div').then(() => added = true);
-      expect(added).toBe(false);
+      const waitForSelectorPromise = frame2.waitForSelector('div');
       await frame1.evaluate(addElement, 'div');
-      expect(added).toBe(false);
       await frame2.evaluate(addElement, 'div');
-      await waitForSelectorPromise;
+      const eHandle = await waitForSelectorPromise;
+      expect(eHandle.executionContext().frame()).toBe(frame2);
     });
 
     it('should throw if evaluation failed', async({page, server}) => {
@@ -971,13 +1016,11 @@ describe('Page', function() {
       await FrameUtils.attachFrame(page, 'frame2', server.EMPTY_PAGE);
       const frame1 = page.frames()[1];
       const frame2 = page.frames()[2];
-      let added = false;
-      const waitForXPathPromise = frame2.waitForXPath('//div').then(() => added = true);
-      expect(added).toBe(false);
+      const waitForXPathPromise = frame2.waitForXPath('//div');
       await frame1.evaluate(addElement, 'div');
-      expect(added).toBe(false);
       await frame2.evaluate(addElement, 'div');
-      await waitForXPathPromise;
+      const eHandle = await waitForXPathPromise;
+      expect(eHandle.executionContext().frame()).toBe(frame2);
     });
     it('should throw if evaluation failed', async({page, server}) => {
       await page.evaluateOnNewDocument(function() {
@@ -1362,6 +1405,16 @@ describe('Page', function() {
       expect(response.status()).toBe(200);
       expect(response.url()).toContain('self-request.html');
     });
+    it('should fail when navigating and show the url at the error message', async function({page, server, httpsServer}) {
+      const url = httpsServer.PREFIX + '/redirect/1.html';
+      let error = null;
+      try {
+        await page.goto(url);
+      } catch (e) {
+        error = e;
+      }
+      expect(error.message).toContain(url);
+    });
   });
 
   describe('Page.waitForNavigation', function() {
@@ -1593,6 +1646,15 @@ describe('Page', function() {
       expect(response.url()).toContain('empty.html');
       expect(requests.length).toBe(5);
       expect(requests[2].resourceType()).toBe('document');
+      // Check redirect chain
+      const redirectChain = response.request().redirectChain();
+      expect(redirectChain.length).toBe(4);
+      expect(redirectChain[0].url()).toContain('/non-existing-page.html');
+      expect(redirectChain[2].url()).toContain('/non-existing-page-3.html');
+      for (let i = 0; i < redirectChain.length; ++i) {
+        const request = redirectChain[i];
+        expect(request.redirectChain().indexOf(request)).toBe(i);
+      }
     });
     it('should be able to abort redirects', async({page, server}) => {
       await page.setRequestInterception(true);
@@ -2000,6 +2062,24 @@ describe('Page', function() {
       const element = await page.$('div');
       expect(await element.boundingBox()).toBe(null);
     });
+    it('should force a layout', async({page, server}) => {
+      await page.setViewport({ width: 500, height: 500 });
+      await page.setContent('<div style="width: 100px; height: 100px">hello</div>');
+      const elementHandle = await page.$('div');
+      await page.evaluate(element => element.style.height = '200px', elementHandle);
+      const box = await elementHandle.boundingBox();
+      expect(box).toEqual({ x: 8, y: 8, width: 100, height: 200 });
+    });
+  });
+
+  describe('ElementHandle.contentFrame', function() {
+    it('should work', async({page,server}) => {
+      await page.goto(server.EMPTY_PAGE);
+      await FrameUtils.attachFrame(page, 'frame1', server.EMPTY_PAGE);
+      const elementHandle = await page.$('#frame1');
+      const frame = await elementHandle.contentFrame();
+      expect(frame).toBe(page.frames()[1]);
+    });
   });
 
   describe('ElementHandle.click', function() {
@@ -2035,20 +2115,20 @@ describe('Page', function() {
       const button = await page.$('button');
       await page.evaluate(button => button.style.display = 'none', button);
       const error = await button.click().catch(err => err);
-      expect(error.message).toBe('Node is not visible');
+      expect(error.message).toBe('Node is either not visible or not an HTMLElement');
     });
     it('should throw for recursively hidden nodes', async({page, server}) => {
       await page.goto(server.PREFIX + '/input/button.html');
       const button = await page.$('button');
       await page.evaluate(button => button.parentElement.style.display = 'none', button);
       const error = await button.click().catch(err => err);
-      expect(error.message).toBe('Node is not visible');
+      expect(error.message).toBe('Node is either not visible or not an HTMLElement');
     });
     it('should throw for <br> elements', async({page, server}) => {
       await page.setContent('hello<br>goodbye');
       const br = await page.$('br');
       const error = await br.click().catch(err => err);
-      expect(error.message).toBe('Node is not visible');
+      expect(error.message).toBe('Node is either not visible or not an HTMLElement');
     });
   });
 
@@ -2086,6 +2166,27 @@ describe('Page', function() {
       const elementHandle = await page.$('div');
       const screenshot = await elementHandle.screenshot();
       expect(screenshot).toBeGolden('screenshot-element-padding-border.png');
+    });
+    it('should capture full element when larger than viewport', async({page, server}) => {
+      await page.setViewport({width: 500, height: 500});
+
+      await page.setContent(`
+        something above
+        <style>
+        div.to-screenshot {
+          border: 1px solid blue;
+          width: 600px;
+          height: 600px;
+          margin-left: 50px;
+        }
+        </style>
+        <div class="to-screenshot"></div>
+      `);
+      const elementHandle = await page.$('div.to-screenshot');
+      const screenshot = await elementHandle.screenshot();
+      expect(screenshot).toBeGolden('screenshot-element-larger-than-viewport.png');
+
+      expect(await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))).toEqual({ w: 500, h: 500 });
     });
     it('should scroll element into view', async({page, server}) => {
       await page.setViewport({width: 500, height: 500});
@@ -2128,7 +2229,7 @@ describe('Page', function() {
       const elementHandle = await page.$('h1');
       await page.evaluate(element => element.remove(), elementHandle);
       const screenshotError = await elementHandle.screenshot().catch(error => error);
-      expect(screenshotError.message).toBe('Node is detached from document');
+      expect(screenshotError.message).toBe('Node is either not visible or not an HTMLElement');
     });
   });
 
@@ -2763,6 +2864,7 @@ describe('Page', function() {
 
       // Load and re-load to make sure serviceworker is installed and running.
       await page.goto(server.PREFIX + '/serviceworkers/fetch/sw.html', {waitUntil: 'networkidle2'});
+      await page.evaluate(async() => await window.activationPromise);
       await page.reload();
 
       expect(responses.size).toBe(2);
@@ -2855,7 +2957,7 @@ describe('Page', function() {
       page.on('requestfailed', request => events.push(`FAIL ${request.url()}`));
       server.setRedirect('/foo.html', '/empty.html');
       const FOO_URL = server.PREFIX + '/foo.html';
-      await page.goto(FOO_URL);
+      const response = await page.goto(FOO_URL);
       expect(events).toEqual([
         `GET ${FOO_URL}`,
         `302 ${FOO_URL}`,
@@ -2864,6 +2966,11 @@ describe('Page', function() {
         `200 ${server.EMPTY_PAGE}`,
         `DONE ${server.EMPTY_PAGE}`
       ]);
+
+      // Check redirect chain
+      const redirectChain = response.request().redirectChain();
+      expect(redirectChain.length).toBe(1);
+      expect(redirectChain[0].url()).toContain('/foo.html');
     });
   });
 
@@ -2883,6 +2990,26 @@ describe('Page', function() {
       const scriptHandle = await page.addScriptTag({ url: '/injectedfile.js' });
       expect(scriptHandle.asElement()).not.toBeNull();
       expect(await page.evaluate(() => __injected)).toBe(42);
+    });
+
+    it('should work with a url and type=module', async({page, server}) => {
+      await page.goto(server.EMPTY_PAGE);
+      await page.addScriptTag({ url: '/es6/es6import.js', type: 'module' });
+      expect(await page.evaluate(() => __es6injected)).toBe(42);
+    });
+
+    it('should work with a path and type=module', async({page, server}) => {
+      await page.goto(server.EMPTY_PAGE);
+      await page.addScriptTag({ path: path.join(__dirname, 'assets/es6/es6pathimport.js'), type: 'module' });
+      await page.waitForFunction('window.__es6injected');
+      expect(await page.evaluate(() => __es6injected)).toBe(42);
+    });
+
+    it('should work with a content and type=module', async({page, server}) => {
+      await page.goto(server.EMPTY_PAGE);
+      await page.addScriptTag({ content: `import num from '/es6/es6module.js';window.__es6injected = num;`, type: 'module' });
+      await page.waitForFunction('window.__es6injected');
+      expect(await page.evaluate(() => __es6injected)).toBe(42);
     });
 
     it('should throw an error if loading from url fail', async({page, server}) => {
@@ -3653,6 +3780,7 @@ describe('Page', function() {
     it('should report when a service worker is created and destroyed', async({page, server, browser}) => {
       await page.goto(server.EMPTY_PAGE);
       const createdTarget = new Promise(fulfill => browser.once('targetcreated', target => fulfill(target)));
+
       await page.goto(server.PREFIX + '/serviceworkers/empty/sw.html');
 
       expect((await createdTarget).type()).toBe('service_worker');
