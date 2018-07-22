@@ -25,17 +25,21 @@ if (process.env.NPM_CONFIG_PUPPETEER_SKIP_CHROMIUM_DOWNLOAD || process.env.npm_c
   return;
 }
 
-const Downloader = require('./lib/Downloader');
-const downloader = Downloader.createDefault();
+const downloadHost = process.env.PUPPETEER_DOWNLOAD_HOST || process.env.npm_config_puppeteer_download_host;
 
-const platform = downloader.currentPlatform();
-const revision = Downloader.defaultRevision();
-const ProgressBar = require('progress');
+const puppeteer = require('./index');
+const browserFetcher = puppeteer.createBrowserFetcher({ host: downloadHost });
 
-const revisionInfo = downloader.revisionInfo(platform, revision);
+const revision = process.env.PUPPETEER_CHROMIUM_REVISION || process.env.npm_config_puppeteer_chromium_revision
+  || require('./package.json').puppeteer.chromium_revision;
+
+const revisionInfo = browserFetcher.revisionInfo(revision);
+
 // Do nothing if the revision is already downloaded.
-if (revisionInfo.downloaded)
+if (revisionInfo.local) {
+  generateProtocolTypesIfNecessary(false /* updated */);
   return;
+}
 
 // Override current environment proxy settings with npm configuration, if any.
 const NPM_HTTPS_PROXY = process.env.npm_config_https_proxy || process.env.npm_config_proxy;
@@ -49,22 +53,21 @@ if (NPM_HTTP_PROXY)
 if (NPM_NO_PROXY)
   process.env.NO_PROXY = NPM_NO_PROXY;
 
-const allRevisions = downloader.downloadedRevisions();
-const downloadHost = process.env.PUPPETEER_DOWNLOAD_HOST || process.env.npm_config_puppeteer_download_host;
-if (downloadHost)
-  downloader.setDownloadHost(downloadHost);
-downloader.downloadRevision(platform, revision, onProgress)
+browserFetcher.download(revisionInfo.revision, onProgress)
+    .then(() => browserFetcher.localRevisions())
     .then(onSuccess)
     .catch(onError);
 
 /**
+ * @param {!Array<string>}
  * @return {!Promise}
  */
-function onSuccess() {
+function onSuccess(localRevisions) {
   console.log('Chromium downloaded to ' + revisionInfo.folderPath);
+  localRevisions = localRevisions.filter(revision => revision !== revisionInfo.revision);
   // Remove previous chromium revisions.
-  const cleanupOldVersions = allRevisions.map(({platform, revision}) => downloader.removeRevision(platform, revision));
-  return Promise.all(cleanupOldVersions);
+  const cleanupOldVersions = localRevisions.map(revision => browserFetcher.remove(revision));
+  return Promise.all([...cleanupOldVersions, generateProtocolTypesIfNecessary(true /* updated */)]);
 }
 
 /**
@@ -77,15 +80,19 @@ function onError(error) {
 }
 
 let progressBar = null;
-function onProgress(bytesTotal, delta) {
+let lastDownloadedBytes = 0;
+function onProgress(downloadedBytes, totalBytes) {
   if (!progressBar) {
-    progressBar = new ProgressBar(`Downloading Chromium r${revision} - ${toMegabytes(bytesTotal)} [:bar] :percent :etas `, {
+    const ProgressBar = require('progress');
+    progressBar = new ProgressBar(`Downloading Chromium r${revision} - ${toMegabytes(totalBytes)} [:bar] :percent :etas `, {
       complete: '=',
       incomplete: ' ',
       width: 20,
-      total: bytesTotal,
+      total: totalBytes,
     });
   }
+  const delta = downloadedBytes - lastDownloadedBytes;
+  lastDownloadedBytes = downloadedBytes;
   progressBar.tick(delta);
 }
 
@@ -102,16 +109,31 @@ function buildNode6IfNecessary() {
   // folder.
   if (!fs.existsSync(path.join('utils', 'node6-transform')))
     return;
-  let asyncawait = true;
-  try {
-    new Function('async function test(){await 1}');
-  } catch (error) {
-    asyncawait = false;
-  }
   // if async/await is supported, then node6 is not needed.
-  if (asyncawait)
+  if (supportsAsyncAwait())
     return;
   // Re-build node6/ folder.
   console.log('Building Puppeteer for Node 6');
   require(path.join(__dirname, 'utils', 'node6-transform'));
+}
+
+function supportsAsyncAwait() {
+  try {
+    new Function('async function test(){await 1}');
+  } catch (error) {
+    return false;
+  }
+  return true;
+}
+
+function generateProtocolTypesIfNecessary(updated) {
+  if (!supportsAsyncAwait())
+    return;
+  const fs = require('fs');
+  const path = require('path');
+  if (!fs.existsSync(path.join(__dirname, 'utils', 'protocol-types-generator')))
+    return;
+  if (!updated && fs.existsSync(path.join(__dirname, 'lib', 'protocol.d.ts')))
+    return;
+  return require('./utils/protocol-types-generator');
 }

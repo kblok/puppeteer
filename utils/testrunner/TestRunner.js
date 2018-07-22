@@ -265,7 +265,7 @@ class TestRunner extends EventEmitter {
     this._currentSuite = this._rootSuite;
     this._tests = [];
     // Default timeout is 10 seconds.
-    this._timeout = options.timeout === 0 ? 2147483647 : options.timeout ||  10 * 1000;
+    this._timeout = options.timeout === 0 ? 2147483647 : options.timeout || 10 * 1000;
     this._parallel = options.parallel || 1;
     this._retryFailures = !!options.retryFailures;
 
@@ -295,7 +295,11 @@ class TestRunner extends EventEmitter {
   }
 
   _addTest(mode, name, callback) {
-    const test = new Test(this._currentSuite, name, callback, mode, this._timeout);
+    let suite = this._currentSuite;
+    let isSkipped = suite.declaredMode === TestMode.Skip;
+    while ((suite = suite.parentSuite))
+      isSkipped |= suite.declaredMode === TestMode.Skip;
+    const test = new Test(this._currentSuite, name, callback, isSkipped ? TestMode.Skip : mode, this._timeout);
     this._currentSuite.children.push(test);
     this._tests.push(test);
     this._hasFocusedTestsOrSuites = this._hasFocusedTestsOrSuites || mode === TestMode.Focus;
@@ -312,7 +316,7 @@ class TestRunner extends EventEmitter {
   }
 
   _addHook(hookName, callback) {
-    console.assert(this._currentSuite[hookName] === null, `Only one ${hookName} hook available per suite`);
+    assert(this._currentSuite[hookName] === null, `Only one ${hookName} hook available per suite`);
     const hook = new UserCallback(callback, this._timeout);
     this._currentSuite[hookName] = hook;
   }
@@ -383,6 +387,15 @@ class TestRunner extends EventEmitter {
   _didFinishTest(test) {
     this.emit('testfinished', test);
   }
+}
+
+/**
+ * @param {*} value
+ * @param {string=} message
+ */
+function assert(value, message) {
+  if (!value)
+    throw new Error(message);
 }
 
 TestRunner.Events = {

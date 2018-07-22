@@ -72,4 +72,13 @@ const utils = module.exports = {
       result += '\n' + utils.dumpFrames(child, '    ' + indentation);
     return result;
   },
+
+  /**
+   * @param {!EventEmitter} emitter
+   * @param {string} eventName
+   * @return {!Promise<!Object>}
+   */
+  waitEvent: function(emitter, eventName) {
+    return new Promise(fulfill => emitter.once(eventName, fulfill));
+  },
 };

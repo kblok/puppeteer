@@ -37,14 +37,15 @@ class Expect {
     this.not.not = this;
     for (const matcherName of Object.keys(matchers)) {
       const matcher = matchers[matcherName];
-      this[matcherName] = applyMatcher.bind(null, matcherName, matcher, false, value);
-      this.not[matcherName] = applyMatcher.bind(null, matcherName, matcher, true, value);
+      this[matcherName] = applyMatcher.bind(null, matcherName, matcher, false /* inverse */, value);
+      this.not[matcherName] = applyMatcher.bind(null, matcherName, matcher, true /* inverse */, value);
     }
 
     function applyMatcher(matcherName, matcher, inverse, value, ...args) {
       const result = matcher.call(null, value, ...args);
-      const message = `expect.${matcherName} failed` + (result.message ? `: ${result.message}` : '');
-      console.assert(result.pass !== inverse, message);
+      const message = `expect.${inverse ? 'not.' : ''}${matcherName} failed` + (result.message ? `: ${result.message}` : '');
+      if (result.pass === inverse)
+        throw new Error(message);
     }
   }
 }
@@ -96,8 +97,10 @@ const DefaultMatchers = {
   },
 
   toEqual: function(value, other, message) {
-    message = message || `${JSON.stringify(value)} ≈ ${JSON.stringify(other)}`;
-    return { pass: JSON.stringify(value) === JSON.stringify(other), message };
+    const valueJson = stringify(value);
+    const otherJson = stringify(other);
+    message = message || `${valueJson} ≈ ${otherJson}`;
+    return { pass: valueJson === otherJson, message };
   },
 
   toBeCloseTo: function(value, other, precision, message) {
@@ -107,3 +110,16 @@ const DefaultMatchers = {
     };
   }
 };
+
+function stringify(value) {
+  function stabilize(key, object) {
+    if (typeof object !== 'object' || object === undefined || object === null)
+      return object;
+    const result = {};
+    for (const key of Object.keys(object).sort())
+      result[key] = object[key];
+    return result;
+  }
+
+  return JSON.stringify(stabilize(null, value), stabilize);
+}
