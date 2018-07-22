@@ -15,9 +15,9 @@
  */
 const fs = require('fs');
 const os = require('os');
-const rm = require('rimraf').sync;
 const path = require('path');
 const {helper} = require('../lib/helper');
+const rmAsync = helper.promisify(require('rimraf'));
 const mkdtempAsync = helper.promisify(fs.mkdtemp);
 const readFileAsync = helper.promisify(fs.readFile);
 const statAsync = helper.promisify(fs.stat);
@@ -57,7 +57,7 @@ module.exports.addTests = function({testRunner, expect, PROJECT_ROOT, defaultBro
         expect(await browserFetcher.localRevisions()).toEqual(['123456']);
         await browserFetcher.remove('123456');
         expect(await browserFetcher.localRevisions()).toEqual([]);
-        rm(downloadsFolder);
+        await rmAsync(downloadsFolder);
       });
     });
     describe('AppMode', function() {
@@ -70,46 +70,8 @@ module.exports.addTests = function({testRunner, expect, PROJECT_ROOT, defaultBro
         await browser.close();
       });
     });
+
     describe('Puppeteer.launch', function() {
-      it('should support ignoreHTTPSErrors option', async({httpsServer}) => {
-        const options = Object.assign({ignoreHTTPSErrors: true}, defaultBrowserOptions);
-        const browser = await puppeteer.launch(options);
-        const page = await browser.newPage();
-        let error = null;
-        const response = await page.goto(httpsServer.EMPTY_PAGE).catch(e => error = e);
-        expect(error).toBe(null);
-        expect(response.ok()).toBe(true);
-        expect(response.securityDetails()).toBeTruthy();
-        expect(response.securityDetails().protocol()).toBe('TLS 1.2');
-        await page.close();
-        await browser.close();
-      });
-      it('Network redirects should report SecurityDetails', async({httpsServer}) => {
-        const options = Object.assign({ignoreHTTPSErrors: true}, defaultBrowserOptions);
-        const browser = await puppeteer.launch(options);
-        const page = await browser.newPage();
-        httpsServer.setRedirect('/plzredirect', '/empty.html');
-        const responses =  [];
-        page.on('response', response => responses.push(response));
-        await page.goto(httpsServer.PREFIX + '/plzredirect');
-        expect(responses.length).toBe(2);
-        expect(responses[0].status()).toBe(302);
-        const securityDetails = responses[0].securityDetails();
-        expect(securityDetails.protocol()).toBe('TLS 1.2');
-        await page.close();
-        await browser.close();
-      });
-      it('should work with mixed content', async({server, httpsServer}) => {
-        httpsServer.setRoute('/mixedcontent.html', (req, res) => {
-          res.end(`<iframe src=${server.EMPTY_PAGE}></iframe>`);
-        });
-        const options = Object.assign({ignoreHTTPSErrors: true}, defaultBrowserOptions);
-        const browser = await puppeteer.launch(options);
-        const page = await browser.newPage();
-        await page.goto(httpsServer.PREFIX + '/mixedcontent.html', {waitUntil: 'load'});
-        await page.close();
-        await browser.close();
-      });
       it('should reject all promises when browser is closed', async() => {
         const browser = await puppeteer.launch(defaultBrowserOptions);
         const page = await browser.newPage();
@@ -134,7 +96,8 @@ module.exports.addTests = function({testRunner, expect, PROJECT_ROOT, defaultBro
         expect(fs.readdirSync(userDataDir).length).toBeGreaterThan(0);
         await browser.close();
         expect(fs.readdirSync(userDataDir).length).toBeGreaterThan(0);
-        rm(userDataDir);
+        // This might throw. See https://github.com/GoogleChrome/puppeteer/issues/2778
+        await rmAsync(userDataDir).catch(e => {});
       });
       it('userDataDir argument', async({server}) => {
         const userDataDir = await mkdtempAsync(TMP_FOLDER);
@@ -144,7 +107,8 @@ module.exports.addTests = function({testRunner, expect, PROJECT_ROOT, defaultBro
         expect(fs.readdirSync(userDataDir).length).toBeGreaterThan(0);
         await browser.close();
         expect(fs.readdirSync(userDataDir).length).toBeGreaterThan(0);
-        rm(userDataDir);
+        // This might throw. See https://github.com/GoogleChrome/puppeteer/issues/2778
+        await rmAsync(userDataDir).catch(e => {});
       });
       it('userDataDir option should restore state', async({server}) => {
         const userDataDir = await mkdtempAsync(TMP_FOLDER);
@@ -160,7 +124,8 @@ module.exports.addTests = function({testRunner, expect, PROJECT_ROOT, defaultBro
         await page2.goto(server.EMPTY_PAGE);
         expect(await page2.evaluate(() => localStorage.hey)).toBe('hello');
         await browser2.close();
-        rm(userDataDir);
+        // This might throw. See https://github.com/GoogleChrome/puppeteer/issues/2778
+        await rmAsync(userDataDir).catch(e => {});
       });
       it('userDataDir option should restore cookies', async({server}) => {
         const userDataDir = await mkdtempAsync(TMP_FOLDER);
@@ -176,7 +141,8 @@ module.exports.addTests = function({testRunner, expect, PROJECT_ROOT, defaultBro
         await page2.goto(server.EMPTY_PAGE);
         expect(await page2.evaluate(() => document.cookie)).toBe('doSomethingOnlyOnce=true');
         await browser2.close();
-        rm(userDataDir);
+        // This might throw. See https://github.com/GoogleChrome/puppeteer/issues/2778
+        await rmAsync(userDataDir).catch(e => {});
       });
       it('should return the default chrome arguments', async() => {
         const args = puppeteer.defaultArgs();

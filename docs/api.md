@@ -1,6 +1,6 @@
-##### Released APIs: [v1.4.0](https://github.com/GoogleChrome/puppeteer/blob/v1.4.0/docs/api.md) | [v1.3.0](https://github.com/GoogleChrome/puppeteer/blob/v1.3.0/docs/api.md) | [v1.2.0](https://github.com/GoogleChrome/puppeteer/blob/v1.2.0/docs/api.md) | [v1.1.1](https://github.com/GoogleChrome/puppeteer/blob/v1.1.1/docs/api.md) | [v1.1.0](https://github.com/GoogleChrome/puppeteer/blob/v1.1.0/docs/api.md) | [v1.0.0](https://github.com/GoogleChrome/puppeteer/blob/v1.0.0/docs/api.md) | [v0.13.0](https://github.com/GoogleChrome/puppeteer/blob/v0.13.0/docs/api.md) | [v0.12.0](https://github.com/GoogleChrome/puppeteer/blob/v0.12.0/docs/api.md) | [v0.11.0](https://github.com/GoogleChrome/puppeteer/blob/v0.11.0/docs/api.md) | [v0.10.2](https://github.com/GoogleChrome/puppeteer/blob/v0.10.2/docs/api.md) | [v0.10.1](https://github.com/GoogleChrome/puppeteer/blob/v0.10.1/docs/api.md) | [v0.10.0](https://github.com/GoogleChrome/puppeteer/blob/v0.10.0/docs/api.md) | [v0.9.0](https://github.com/GoogleChrome/puppeteer/blob/v0.9.0/docs/api.md)
+##### Released APIs: [v1.5.0](https://github.com/GoogleChrome/puppeteer/blob/v1.5.0/docs/api.md) | [v1.4.0](https://github.com/GoogleChrome/puppeteer/blob/v1.4.0/docs/api.md) | [v1.3.0](https://github.com/GoogleChrome/puppeteer/blob/v1.3.0/docs/api.md) | [v1.2.0](https://github.com/GoogleChrome/puppeteer/blob/v1.2.0/docs/api.md) | [v1.1.1](https://github.com/GoogleChrome/puppeteer/blob/v1.1.1/docs/api.md) | [v1.1.0](https://github.com/GoogleChrome/puppeteer/blob/v1.1.0/docs/api.md) | [v1.0.0](https://github.com/GoogleChrome/puppeteer/blob/v1.0.0/docs/api.md) | [v0.13.0](https://github.com/GoogleChrome/puppeteer/blob/v0.13.0/docs/api.md) | [v0.12.0](https://github.com/GoogleChrome/puppeteer/blob/v0.12.0/docs/api.md) | [v0.11.0](https://github.com/GoogleChrome/puppeteer/blob/v0.11.0/docs/api.md) | [v0.10.2](https://github.com/GoogleChrome/puppeteer/blob/v0.10.2/docs/api.md) | [v0.10.1](https://github.com/GoogleChrome/puppeteer/blob/v0.10.1/docs/api.md) | [v0.10.0](https://github.com/GoogleChrome/puppeteer/blob/v0.10.0/docs/api.md) | [v0.9.0](https://github.com/GoogleChrome/puppeteer/blob/v0.9.0/docs/api.md)
 
-# Puppeteer API <!-- GEN:version -->v1.5.0<!-- GEN:stop-->
+# Puppeteer API <!-- GEN:version -->v1.6.0<!-- GEN:stop-->
 
 <!-- GEN:empty-if-release --><!-- GEN:stop -->
 
@@ -126,6 +126,8 @@
   * [page.waitFor(selectorOrFunctionOrTimeout[, options[, ...args]])](#pagewaitforselectororfunctionortimeout-options-args)
   * [page.waitForFunction(pageFunction[, options[, ...args]])](#pagewaitforfunctionpagefunction-options-args)
   * [page.waitForNavigation(options)](#pagewaitfornavigationoptions)
+  * [page.waitForRequest(urlOrPredicate, options)](#pagewaitforrequesturlorpredicate-options)
+  * [page.waitForResponse(urlOrPredicate, options)](#pagewaitforresponseurlorpredicate-options)
   * [page.waitForSelector(selector[, options])](#pagewaitforselectorselector-options)
   * [page.waitForXPath(xpath[, options])](#pagewaitforxpathxpath-options)
   * [page.workers()](#pageworkers)
@@ -218,6 +220,7 @@
   * [elementHandle.getProperties()](#elementhandlegetproperties)
   * [elementHandle.getProperty(propertyName)](#elementhandlegetpropertypropertyname)
   * [elementHandle.hover()](#elementhandlehover)
+  * [elementHandle.isIntersectingViewport()](#elementhandleisintersectingviewport)
   * [elementHandle.jsonValue()](#elementhandlejsonvalue)
   * [elementHandle.press(key[, options])](#elementhandlepresskey-options)
   * [elementHandle.screenshot([options])](#elementhandlescreenshotoptions)
@@ -523,7 +526,7 @@ Disconnects Puppeteer from the browser, but leaves the Chromium process running.
 Promise which resolves to a new [Page] object. The [Page] is created in a default browser context.
 
 #### browser.pages()
-- returns: <[Promise]<[Array]<[Page]>>> Promise which resolves to an array of all open pages.
+- returns: <[Promise]<[Array]<[Page]>>> Promise which resolves to an array of all open pages. Non visible pages, such as `"background_page"`, will not be listed here. You can find them using [target.page()](#targetpage).
 
 #### browser.process()
 - returns: <?[ChildProcess]> Spawned browser process. Returns `null` if the browser instance was created with [`puppeteer.connect`](#puppeteerconnectoptions) method.
@@ -775,7 +778,7 @@ The method runs `document.querySelectorAll` within the page. If no elements matc
 Shortcut for [page.mainFrame().$$(selector)](#frameselector-1).
 
 #### page.$$eval(selector, pageFunction[, ...args])
-- `selector` <[string]> A [selector] to query frame for
+- `selector` <[string]> A [selector] to query page for
 - `pageFunction` <[function]> Function to be evaluated in browser context
 - `...args` <...[Serializable]|[JSHandle]> Arguments to pass to `pageFunction`
 - returns: <[Promise]<[Serializable]>> Promise which resolves to the return value of `pageFunction`
@@ -1169,7 +1172,7 @@ The `page.goto` will throw an error if:
 - the `timeout` is exceeded during navigation.
 - the main resource failed to load.
 
-> **NOTE** `page.goto` either throw or return a main resource response. The only exception is navigation to `about:blank`, which would succeed and return `null`.
+> **NOTE** `page.goto` either throw or return a main resource response. The only exceptions are navigation to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
 
 > **NOTE** Headless mode doesn't support navigating to a PDF document. See the [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
 
@@ -1247,6 +1250,8 @@ Page is guaranteed to have a main frame which persists during navigations.
 > **NOTE** Generating a pdf is currently only supported in Chrome headless.
 
 `page.pdf()` generates a pdf of the page with `print` css media. To generate a pdf with `screen` media, call [page.emulateMedia('screen')](#pageemulatemediamediatype) before calling `page.pdf()`:
+
+> **NOTE** By default, `page.pdf()` generates a pdf with modified colors for printing. Use the [`-webkit-print-color-adjust`](https://developer.mozilla.org/en-US/docs/Web/CSS/-webkit-print-color-adjust) property to force rendering of exact colors.
 
 ```js
 // Generates a PDF with 'screen' media type.
@@ -1554,7 +1559,7 @@ Shortcut for [page.mainFrame().waitForFunction(pageFunction[, options[, ...args]
     - `domcontentloaded` - consider navigation to be finished when the `DOMContentLoaded` event is fired.
     - `networkidle0` - consider navigation to be finished when there are no more than 0 network connections for at least `500` ms.
     - `networkidle2` - consider navigation to be finished when there are no more than 2 network connections for at least `500` ms.
-- returns: <[Promise]<[Response]>> Promise which resolves to the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect.
+- returns: <[Promise]<[?Response]>> Promise which resolves to the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect. In case of navigation to a different anchor or navigation due to History API usage, the navigation will resolve with `null`.
 
 This resolves when the page navigates to a new URL or reloads. It is useful for when you run code
 which will indirectly cause the page to navigate. Consider this example:
@@ -1566,6 +1571,30 @@ await navigationPromise; // The navigationPromise resolves after navigation has 
 ```
 
 **NOTE** Usage of the [History API](https://developer.mozilla.org/en-US/docs/Web/API/History_API) to change the URL is considered a navigation.
+
+#### page.waitForRequest(urlOrPredicate, options)
+- `urlOrPredicate` <[string]|[Function]> A URL or predicate to wait for.
+- `options` <[Object]> Optional waiting parameters
+  - `timeout` <[number]> Maximum wait time in milliseconds, defaults to 30 seconds, pass `0` to disable the timeout.
+- returns: <[Promise]<[Request]>> Promise which resolves to the matched request.
+
+```js
+const firstRequest = await page.waitForRequest('http://example.com/resource');
+const finalRequest = await page.waitForRequest(request => request.url() === 'http://example.com' && request.method() === 'GET');
+return firstRequest.url();
+```
+
+#### page.waitForResponse(urlOrPredicate, options)
+- `urlOrPredicate` <[string]|[Function]> A URL or predicate to wait for.
+- `options` <[Object]> Optional waiting parameters
+  - `timeout` <[number]> Maximum wait time in milliseconds, defaults to 30 seconds, pass `0` to disable the timeout.
+- returns: <[Promise]<[Response]>> Promise which resolves to the matched response.
+
+```js
+const firstResponse = await page.waitForResponse('https://example.com/resource');
+const finalResponse = await page.waitForResponse(response => response.url() === 'https://example.com' && response.status() === 200);
+return finalResponse.ok();
+```
 
 #### page.waitForSelector(selector[, options])
 - `selector` <[string]> A [selector] of an element to wait for
@@ -1727,7 +1756,7 @@ After the key is pressed once, subsequent calls to [`keyboard.down`](#keyboarddo
 
 If `key` is a single character and no modifier keys besides `Shift` are being held down, a `keypress`/`input` event will also generated. The `text` option can be specified to force an input event to be generated.
 
-> **NOTE** Modifier keys DO effect `elementHandle.press`. Holding down `Shift` will type the text in upper case.
+> **NOTE** Modifier keys DO effect `keyboard.press`. Holding down `Shift` will type the text in upper case.
 
 Shortcut for [`keyboard.down`](#keyboarddownkey-options) and [`keyboard.up`](#keyboardupkey).
 
@@ -1914,13 +1943,13 @@ puppeteer.launch().then(async browser => {
 ```
 
 #### frame.$(selector)
-- `selector` <[string]> Selector to query page for
+- `selector` <[string]> A [selector] to query frame for
 - returns: <[Promise]<?[ElementHandle]>> Promise which resolves to ElementHandle pointing to the frame element.
 
 The method queries frame for the selector. If there's no such element within the frame, the method will resolve to `null`.
 
 #### frame.$$(selector)
-- `selector` <[string]> Selector to query page for
+- `selector` <[string]> A [selector] to query frame for
 - returns: <[Promise]<[Array]<[ElementHandle]>>> Promise which resolves to ElementHandles pointing to the frame elements.
 
 The method runs `document.querySelectorAll` within the frame. If no elements match the selector, the return value resolve to `[]`.
@@ -2462,9 +2491,9 @@ expect(await tweetHandle.$eval('.retweets', node => node.innerText)).toBe('10');
 
 #### elementHandle.$x(expression)
 - `expression` <[string]> Expression to [evaluate](https://developer.mozilla.org/en-US/docs/Web/API/Document/evaluate).
-- returns: <[Promise]<?[ElementHandle]>> Promise which resolves to ElementHandle pointing to the frame element.
+- returns: <[Promise]<[Array]<[ElementHandle]>>>
 
-The method evaluates the XPath expression relative to the elementHandle. If there's no such element, the method will resolve to `null`.
+The method evaluates the XPath expression relative to the elementHandle. If there are no such elements, the method will resolve to an empty array.
 
 #### elementHandle.asElement()
 - returns: <[elementhandle]>
@@ -2543,6 +2572,9 @@ Fetches a single property from the objectHandle.
 
 This method scrolls element into view if needed, and then uses [page.mouse](#pagemouse) to hover over the center of the element.
 If the element is detached from DOM, the method throws an error.
+
+#### elementHandle.isIntersectingViewport()
+- returns: <[Promise]<[boolean]>> Resolves to true if the element is visible in the current viewport.
 
 #### elementHandle.jsonValue()
 - returns: <[Promise]<[Object]>>
@@ -2626,6 +2658,8 @@ If request gets a 'redirect' response, the request is successfully finished with
   - `accessdenied` - Permission to access a resource, other than the network, was denied
   - `addressunreachable` - The IP address is unreachable. This usually means
     that there is no route to the specified host or network.
+  - `blockedbyclient` - The client chose to block the request.
+  - `blockedbyresponse` - The request failed because the response was delivered along with requirements which are not met ('X-Frame-Options' and 'Content-Security-Policy' ancestor checks, for instance).
   - `connectionaborted` - A connection timed out as a result of not receiving an ACK for data sent.
   - `connectionclosed` - A connection was closed (corresponding to a TCP FIN).
   - `connectionfailed` - A connection attempt failed.
@@ -2845,7 +2879,7 @@ Get the target that opened this target. Top-level targets return `null`.
 #### target.page()
 - returns: <[Promise]<?[Page]>>
 
-If the target is not of type `"page"`, returns `null`.
+If the target is not of type `"page"` or `"background_page"`, returns `null`.
 
 #### target.type()
 - returns: <[string]>
@@ -2929,7 +2963,10 @@ _To output coverage in a form consumable by [Istanbul](https://github.com/istanb
 #### coverage.startJSCoverage(options)
 - `options` <[Object]>  Set of configurable options for coverage
   - `resetOnNavigation` <[boolean]> Whether to reset coverage on every navigation. Defaults to `true`.
+  - `reportAnonymousScripts` <[boolean]> Whether anonymous scripts generated by the page should be reported. Defaults to `false`.
 - returns: <[Promise]> Promise that resolves when coverage is started
+
+> **NOTE** Anonymous scripts are ones that don't have an associated url. These are scripts that are dynamically created on the page using `eval` or `new Function`. If `reportAnonymousScripts` is set to `true`, anonymous scripts will have `__puppeteer_evaluation_script__` as their URL.
 
 #### coverage.stopCSSCoverage()
 - returns: <[Promise]<[Array]<[Object]>>> Promise that resolves to the array of coverage reports for all stylesheets
@@ -2942,14 +2979,14 @@ _To output coverage in a form consumable by [Istanbul](https://github.com/istanb
 > **NOTE** CSS Coverage doesn't include dynamically injected style tags without sourceURLs.
 
 #### coverage.stopJSCoverage()
-- returns: <[Promise]<[Array]<[Object]>>> Promise that resolves to the array of coverage reports for all non-anonymous scripts
+- returns: <[Promise]<[Array]<[Object]>>> Promise that resolves to the array of coverage reports for all scripts
   - `url` <[string]> Script URL
   - `text` <[string]> Script content
   - `ranges` <[Array]<[Object]>> Script ranges that were executed. Ranges are sorted and non-overlapping.
     - `start` <[number]> A start offset in text, inclusive
     - `end` <[number]> An end offset in text, exclusive
 
-> **NOTE** JavaScript Coverage doesn't include anonymous scripts. However, scripts with sourceURLs are
+> **NOTE** JavaScript Coverage doesn't include anonymous scripts by default. However, scripts with sourceURLs are
 reported.
 
 [Array]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array "Array"

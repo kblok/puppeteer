@@ -84,6 +84,14 @@ module.exports.addTests = function({testRunner, expect}) {
       await page.evaluate(() => window.__FOO = 1);
       await watchdog;
     });
+    it('should work when resolved right before execution context disposal', async({page, server}) => {
+      await page.evaluateOnNewDocument(() => window.__RELOADED = true);
+      await page.waitForFunction(() => {
+        if (!window.__RELOADED)
+          window.location.reload();
+        return true;
+      });
+    });
     it('should poll on interval', async({page, server}) => {
       let success = false;
       const startTime = Date.now();
@@ -323,6 +331,11 @@ module.exports.addTests = function({testRunner, expect}) {
       const waitForSelector = page.waitForSelector('.zombo');
       await page.setContent(`<div class='zombo'>anything</div>`);
       expect(await page.evaluate(x => x.textContent, await waitForSelector)).toBe('anything');
+    });
+    it('should have correct stack trace for timeout', async({page, server}) => {
+      let error;
+      await page.waitForSelector('.zombo', {timeout: 10}).catch(e => error = e);
+      expect(error.stack).toContain('frame.spec.js');
     });
   });
 
