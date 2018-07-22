@@ -54,6 +54,12 @@ module.exports.addTests = function({testRunner, expect, puppeteer, DeviceDescrip
       dialog.accept();
       await waitEvent(newPage, 'close');
     });
+    it('should set the page close state', async({ browser }) => {
+      const newPage = await browser.newPage();
+      expect(newPage.isClosed()).toBe(false);
+      await newPage.close();
+      expect(newPage.isClosed()).toBe(true);
+    });
   });
 
   describe('Page.Events.error', function() {
@@ -1503,6 +1509,14 @@ module.exports.addTests = function({testRunner, expect, puppeteer, DeviceDescrip
         }
       });
       expect(screenshot).toBeGolden('screenshot-clip-odd-size.png');
+    });
+    it('should return base64', async({page, server}) => {
+      await page.setViewport({width: 500, height: 500});
+      await page.goto(server.PREFIX + '/grid.html');
+      const screenshot = await page.screenshot({
+        encoding: 'base64'
+      });
+      expect(Buffer.from(screenshot, 'base64')).toBeGolden('screenshot-sanity.png');
     });
   });
 
