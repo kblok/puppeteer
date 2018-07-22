@@ -1,6 +1,8 @@
-##### Released APIs: [v1.2.0](https://github.com/GoogleChrome/puppeteer/blob/v1.2.0/docs/api.md) | [v1.1.1](https://github.com/GoogleChrome/puppeteer/blob/v1.1.1/docs/api.md) | [v1.1.0](https://github.com/GoogleChrome/puppeteer/blob/v1.1.0/docs/api.md) | [v1.0.0](https://github.com/GoogleChrome/puppeteer/blob/v1.0.0/docs/api.md) | [v0.13.0](https://github.com/GoogleChrome/puppeteer/blob/v0.13.0/docs/api.md) | [v0.12.0](https://github.com/GoogleChrome/puppeteer/blob/v0.12.0/docs/api.md) | [v0.11.0](https://github.com/GoogleChrome/puppeteer/blob/v0.11.0/docs/api.md) | [v0.10.2](https://github.com/GoogleChrome/puppeteer/blob/v0.10.2/docs/api.md) | [v0.10.1](https://github.com/GoogleChrome/puppeteer/blob/v0.10.1/docs/api.md) | [v0.10.0](https://github.com/GoogleChrome/puppeteer/blob/v0.10.0/docs/api.md) | [v0.9.0](https://github.com/GoogleChrome/puppeteer/blob/v0.9.0/docs/api.md)
+##### Released APIs: [v1.3.0](https://github.com/GoogleChrome/puppeteer/blob/v1.3.0/docs/api.md) | [v1.2.0](https://github.com/GoogleChrome/puppeteer/blob/v1.2.0/docs/api.md) | [v1.1.1](https://github.com/GoogleChrome/puppeteer/blob/v1.1.1/docs/api.md) | [v1.1.0](https://github.com/GoogleChrome/puppeteer/blob/v1.1.0/docs/api.md) | [v1.0.0](https://github.com/GoogleChrome/puppeteer/blob/v1.0.0/docs/api.md) | [v0.13.0](https://github.com/GoogleChrome/puppeteer/blob/v0.13.0/docs/api.md) | [v0.12.0](https://github.com/GoogleChrome/puppeteer/blob/v0.12.0/docs/api.md) | [v0.11.0](https://github.com/GoogleChrome/puppeteer/blob/v0.11.0/docs/api.md) | [v0.10.2](https://github.com/GoogleChrome/puppeteer/blob/v0.10.2/docs/api.md) | [v0.10.1](https://github.com/GoogleChrome/puppeteer/blob/v0.10.1/docs/api.md) | [v0.10.0](https://github.com/GoogleChrome/puppeteer/blob/v0.10.0/docs/api.md) | [v0.9.0](https://github.com/GoogleChrome/puppeteer/blob/v0.9.0/docs/api.md)
 
-# Puppeteer API v<!-- GEN:version -->1.3.0<!-- GEN:stop--> \*\*NOT RELEASED\*\*
+# Puppeteer API <!-- GEN:version -->v1.4.0<!-- GEN:stop-->
+
+<!-- GEN:empty-if-release --><!-- GEN:stop -->
 
 
 ##### Table of Contents
@@ -61,8 +63,9 @@
   * [page.addStyleTag(options)](#pageaddstyletagoptions)
   * [page.authenticate(credentials)](#pageauthenticatecredentials)
   * [page.bringToFront()](#pagebringtofront)
+  * [page.browser()](#pagebrowser)
   * [page.click(selector[, options])](#pageclickselector-options)
-  * [page.close()](#pageclose)
+  * [page.close(options)](#pagecloseoptions)
   * [page.content()](#pagecontent)
   * [page.cookies(...urls)](#pagecookiesurls)
   * [page.coverage](#pagecoverage)
@@ -182,6 +185,7 @@
 - [class: ElementHandle](#class-elementhandle)
   * [elementHandle.$(selector)](#elementhandleselector)
   * [elementHandle.$$(selector)](#elementhandleselector)
+  * [elementHandle.$eval(selector, pageFunction, ...args)](#elementhandleevalselector-pagefunction-args)
   * [elementHandle.$x(expression)](#elementhandlexexpression)
   * [elementHandle.asElement()](#elementhandleaselement)
   * [elementHandle.boundingBox()](#elementhandleboundingbox)
@@ -233,6 +237,7 @@
   * [securityDetails.validFrom()](#securitydetailsvalidfrom)
   * [securityDetails.validTo()](#securitydetailsvalidto)
 - [class: Target](#class-target)
+  * [target.browser()](#targetbrowser)
   * [target.createCDPSession()](#targetcreatecdpsession)
   * [target.page()](#targetpage)
   * [target.type()](#targettype)
@@ -254,7 +259,7 @@ Puppeteer is a Node library which provides a high-level API to control Chromium 
 
 The Puppeteer API is hierarchical and mirrors the browser structure. On the following diagram, faded entities are not currently represented in Puppeteer.
 
-![puppeteer overview](https://user-images.githubusercontent.com/746130/31592143-089f6f9a-b1db-11e7-9a20-16b7fc754fa1.png)
+![puppeteer overview](https://user-images.githubusercontent.com/746130/38952006-1c3c9c16-42ff-11e8-93af-e498076f28b4.png)
 
 - [`Puppeteer`](#class-puppeteer) communicates with the browser using [DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/).
 - [`Browser`](#class-browser) instance can own multiple pages.
@@ -711,6 +716,12 @@ To disable authentication, pass `null`.
 
 Brings page to front (activates tab).
 
+#### page.browser()
+
+- returns: <[Browser]>
+
+Get the browser the page belongs to.
+
 #### page.click(selector[, options])
 - `selector` <[string]> A [selector] to search for element to click. If there are multiple elements satisfying the selector, the first will be clicked.
 - `options` <[Object]>
@@ -733,8 +744,17 @@ const [response] = await Promise.all([
 
 Shortcut for [page.mainFrame().click(selector[, options])](#frameclickselector-options).
 
-#### page.close()
+#### page.close(options)
+- `options` <[Object]>
+  - `runBeforeUnload` <[boolean]> Defaults to `false`. Whether to run the
+    [before unload](https://developer.mozilla.org/en-US/docs/Web/Events/beforeunload)
+    page handlers.
 - returns: <[Promise]>
+
+By default, `page.close()` **does not** run beforeunload handlers.
+
+> **NOTE** if `runBeforeUnload` is passed as true, a `beforeunload` dialog might be summoned
+> and should be handled manually via page's ['dialog'](#event-dialog) event.
 
 #### page.content()
 - returns: <[Promise]<[String]>>
@@ -1389,6 +1409,17 @@ Shortcut for [page.mainFrame().waitForFunction(pageFunction[, options[, ...args]
     - `networkidle0` - consider navigation to be finished when there are no more than 0 network connections for at least `500` ms.
     - `networkidle2` - consider navigation to be finished when there are no more than 2 network connections for at least `500` ms.
 - returns: <[Promise]<[Response]>> Promise which resolves to the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect.
+
+This resolves when the page navigates to a new URL or reloads. It is useful for when you run code
+which will indirectly cause the page to navigate. Consider this example:
+
+```js
+const navigationPromise = page.waitForNavigation();
+await page.click('a.my-link'); // Clicking the link will indirectly cause a navigation
+await navigationPromise; // The navigationPromise resolves after navigation has finished
+```
+
+**NOTE** Usage of the [History API](https://developer.mozilla.org/en-US/docs/Web/API/History_API) to change the URL is considered a navigation.
 
 #### page.waitForSelector(selector[, options])
 - `selector` <[string]> A [selector] of an element to wait for
@@ -2196,6 +2227,23 @@ The method runs `element.querySelector` within the page. If no element matches t
 
 The method runs `element.querySelectorAll` within the page. If no elements match the selector, the return value resolve to `[]`.
 
+#### elementHandle.$eval(selector, pageFunction, ...args)
+- `selector` <[string]> A [selector] to query page for
+- `pageFunction` <[function]> Function to be evaluated in browser context
+- `...args` <...[Serializable]|[JSHandle]> Arguments to pass to `pageFunction`
+- returns: <[Promise]<[Serializable]>> Promise which resolves to the return value of `pageFunction`
+
+This method runs `document.querySelector` within the element and passes it as the first argument to `pageFunction`. If there's no element matching `selector`, the method throws an error.
+
+If `pageFunction` returns a [Promise], then `frame.$eval` would wait for the promise to resolve and return its value.
+
+Examples:
+```js
+const tweetHandle = await page.$('.tweet');
+expect(await tweetHandle.$eval('.like', node => node.innerText)).toBe('100');
+expect(await tweetHandle.$eval('.retweets', node => node.innerText)).toBe('10');
+```
+
 #### elementHandle.$x(expression)
 - `expression` <[string]> Expression to [evaluate](https://developer.mozilla.org/en-US/docs/Web/API/Document/evaluate).
 - returns: <[Promise]<?[ElementHandle]>> Promise which resolves to ElementHandle pointing to the frame element.
@@ -2550,6 +2598,12 @@ Contains the URL of the response.
 - returns: <[number]> [UnixTime] stating the end of validity of the certificate.
 
 ### class: Target
+
+#### target.browser()
+
+- returns: <[Browser]>
+
+Get the browser the target belongs to.
 
 #### target.createCDPSession()
 - returns: <[Promise]<[CDPSession]>>
