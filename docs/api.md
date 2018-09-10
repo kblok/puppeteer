@@ -1,14 +1,21 @@
-##### Released APIs: [v1.6.0](https://github.com/GoogleChrome/puppeteer/blob/v1.6.0/docs/api.md) | [v1.5.0](https://github.com/GoogleChrome/puppeteer/blob/v1.5.0/docs/api.md) | [v1.4.0](https://github.com/GoogleChrome/puppeteer/blob/v1.4.0/docs/api.md) | [v1.3.0](https://github.com/GoogleChrome/puppeteer/blob/v1.3.0/docs/api.md) | [v1.2.0](https://github.com/GoogleChrome/puppeteer/blob/v1.2.0/docs/api.md) | [v1.1.1](https://github.com/GoogleChrome/puppeteer/blob/v1.1.1/docs/api.md) | [v1.1.0](https://github.com/GoogleChrome/puppeteer/blob/v1.1.0/docs/api.md) | [v1.0.0](https://github.com/GoogleChrome/puppeteer/blob/v1.0.0/docs/api.md) | [v0.13.0](https://github.com/GoogleChrome/puppeteer/blob/v0.13.0/docs/api.md) | [v0.12.0](https://github.com/GoogleChrome/puppeteer/blob/v0.12.0/docs/api.md) | [v0.11.0](https://github.com/GoogleChrome/puppeteer/blob/v0.11.0/docs/api.md) | [v0.10.2](https://github.com/GoogleChrome/puppeteer/blob/v0.10.2/docs/api.md) | [v0.10.1](https://github.com/GoogleChrome/puppeteer/blob/v0.10.1/docs/api.md) | [v0.10.0](https://github.com/GoogleChrome/puppeteer/blob/v0.10.0/docs/api.md) | [v0.9.0](https://github.com/GoogleChrome/puppeteer/blob/v0.9.0/docs/api.md)
-
-# Puppeteer API <!-- GEN:version -->v1.7.0<!-- GEN:stop-->
+# Puppeteer API <!-- GEN:version -->v1.8.0<!-- GEN:stop-->
 
 <!-- GEN:empty-if-release --><!-- GEN:stop -->
+- API Translations: [中文|Chinese](https://zhaoqize.github.io/puppeteer-api-zh_CN/#/)
+- Releases per Chromium Version:
+  * Chromium 70.0.3508.0 - [Puppeteer v1.7.0](https://github.com/GoogleChrome/puppeteer/blob/v1.7.0/docs/api.md)
+  * Chromium 69.0.3494.0 - [Puppeteer v1.6.2](https://github.com/GoogleChrome/puppeteer/blob/v1.6.2/docs/api.md)
+  * Chromium 68.0.3419.0 - [Puppeteer v1.4.0](https://github.com/GoogleChrome/puppeteer/blob/v1.4.0/docs/api.md)
+  * Chromium 67.0.3392.0 - [Puppeteer v1.3.0](https://github.com/GoogleChrome/puppeteer/blob/v1.3.0/docs/api.md)
+  * Chromium 66.0.3347.0 - [Puppeteer v1.1.1](https://github.com/GoogleChrome/puppeteer/blob/v1.1.1/docs/api.md)
+  * [All releases](https://github.com/GoogleChrome/puppeteer/releases)
 
 
 ##### Table of Contents
 
 <!-- GEN:toc -->
 - [Overview](#overview)
+- [puppeteer vs puppeteer-core](#puppeteer-vs-puppeteer-core)
 - [Environment Variables](#environment-variables)
 - [Error handling](#error-handling)
 - [Working with Chrome Extensions](#working-with-chrome-extensions)
@@ -33,6 +40,7 @@
   * [browser.browserContexts()](#browserbrowsercontexts)
   * [browser.close()](#browserclose)
   * [browser.createIncognitoBrowserContext()](#browsercreateincognitobrowsercontext)
+  * [browser.defaultBrowserContext()](#browserdefaultbrowsercontext)
   * [browser.disconnect()](#browserdisconnect)
   * [browser.newPage()](#browsernewpage)
   * [browser.pages()](#browserpages)
@@ -46,9 +54,11 @@
   * [event: 'targetcreated'](#event-targetcreated-1)
   * [event: 'targetdestroyed'](#event-targetdestroyed-1)
   * [browserContext.browser()](#browsercontextbrowser)
+  * [browserContext.clearPermissionOverrides()](#browsercontextclearpermissionoverrides)
   * [browserContext.close()](#browsercontextclose)
   * [browserContext.isIncognito()](#browsercontextisincognito)
   * [browserContext.newPage()](#browsercontextnewpage)
+  * [browserContext.overridePermissions(origin, permissions)](#browsercontextoverridepermissionsorigin-permissions)
   * [browserContext.pages()](#browsercontextpages)
   * [browserContext.targets()](#browsercontexttargets)
 - [class: Page](#class-page)
@@ -113,6 +123,7 @@
   * [page.setCookie(...cookies)](#pagesetcookiecookies)
   * [page.setDefaultNavigationTimeout(timeout)](#pagesetdefaultnavigationtimeouttimeout)
   * [page.setExtraHTTPHeaders(headers)](#pagesetextrahttpheadersheaders)
+  * [page.setGeolocation(options)](#pagesetgeolocationoptions)
   * [page.setJavaScriptEnabled(enabled)](#pagesetjavascriptenabledenabled)
   * [page.setOfflineMode(enabled)](#pagesetofflinemodeenabled)
   * [page.setRequestInterception(value)](#pagesetrequestinterceptionvalue)
@@ -252,9 +263,11 @@
   * [response.headers()](#responseheaders)
   * [response.json()](#responsejson)
   * [response.ok()](#responseok)
+  * [response.remoteAddress()](#responseremoteaddress)
   * [response.request()](#responserequest)
   * [response.securityDetails()](#responsesecuritydetails)
   * [response.status()](#responsestatus)
+  * [response.statusText()](#responsestatustext)
   * [response.text()](#responsetext)
   * [response.url()](#responseurl)
 - [class: SecurityDetails](#class-securitydetails)
@@ -301,15 +314,41 @@ The Puppeteer API is hierarchical and mirrors the browser structure.
 
 (Diagram source: [link](https://docs.google.com/drawings/d/1Q_AM6KYs9kbyLZF-Lpp5mtpAWth73Cq8IKCsWYgi8MM/edit?usp=sharing))
 
+### puppeteer vs puppeteer-core
+
+Every release since v1.7.0 we publish two packages:
+- [puppeteer](https://www.npmjs.com/package/puppeteer)
+- [puppeteer-core](https://www.npmjs.com/package/puppeteer-core)
+
+`puppeteer` is a *product* for browser automation. When installed, it downloads a version of
+Chromium, which it then drives using `puppeteer-core`. Being an end-user product, `puppeteer` supports a bunch of convenient `PUPPETEER_*` env variables to tweak its behavior.
+
+`puppeteer-core` is a *library* to help drive anything that supports DevTools protocol. `puppeteer-core` doesn't download Chromium when installed. Being a library, `puppeteer-core` is fully driven
+through its programmatic interface and disregards all the `PUPPETEER_*` env variables.
+
+To sum up, the only differences between `puppeteer-core` and `puppeteer` are:
+- `puppeteer-core` doesn't automatically download Chromium when installed.
+- `puppeteer-core` ignores all `PUPPETEER_*` env variables.
+
+In most cases, you'll be fine using the `puppeteer` package.
+
+However, you should use `puppeteer-core` if:
+- you're building another end-user product or library atop of DevTools protocol. For example, one might build PDF generator using `puppeteer-core` and write a custom `install.js` script that downloads [`headless_shell`](https://chromium.googlesource.com/chromium/src/+/lkgr/headless/README.md) instead of Chromium to save disk space.
+- you're bundling Puppeteer to use in Chrome Extension / browser with the DevTools protocol where downloading an additional Chromium binary is unnecessary.
+
+
 ### Environment Variables
 
 Puppeteer looks for certain [environment variables](https://en.wikipedia.org/wiki/Environment_variable) to aid its operations.
-If puppeteer doesn't find them in the environment, a lowercased variant of these variables will be used from the [npm config](https://docs.npmjs.com/cli/config).
+If Puppeteer doesn't find them in the environment during the installation step, a lowercased variant of these variables will be used from the [npm config](https://docs.npmjs.com/cli/config).
 
 - `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` - defines HTTP proxy settings that are used to download and run Chromium.
 - `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD` - do not download bundled Chromium during installation step.
 - `PUPPETEER_DOWNLOAD_HOST` - overwrite host part of URL that is used to download Chromium
-- `PUPPETEER_CHROMIUM_REVISION` - specify a certain version of chrome you'd like puppeteer to use during the installation step.
+- `PUPPETEER_CHROMIUM_REVISION` - specify a certain version of Chromium you'd like Puppeteer to use. See [puppeteer.launch([options])](#puppeteerlaunchoptions) on how executable path is inferred. **BEWARE**: Puppeteer is only [guaranteed to work](https://github.com/GoogleChrome/puppeteer/#q-why-doesnt-puppeteer-vxxx-work-with-chromium-vyyy) with the bundled Chromium, use at your own risk.
+- `PUPPETEER_EXECUTABLE_PATH` - specify an executable path to be used in `puppeteer.launch`. See [puppeteer.launch([options])](#puppeteerlaunchoptions) on how the executable path is inferred. **BEWARE**: Puppeteer is only [guaranteed to work](https://github.com/GoogleChrome/puppeteer/#q-why-doesnt-puppeteer-vxxx-work-with-chromium-vyyy) with the bundled Chromium, use at your own risk.
+
+> **NOTE** PUPPETEER_* env variables are not accounted for in the [`puppeteer-core`](https://www.npmjs.com/package/puppeteer-core) package.
 
 ### Error handling
 
@@ -422,7 +461,7 @@ The default flags that Chromium will be launched with.
 - `options` <[Object]>  Set of configurable options to set on the browser. Can have the following fields:
   - `ignoreHTTPSErrors` <[boolean]> Whether to ignore HTTPS errors during navigation. Defaults to `false`.
   - `headless` <[boolean]> Whether to run browser in [headless mode](https://developers.google.com/web/updates/2017/04/headless-chrome). Defaults to `true` unless the `devtools` option is `true`.
-  - `executablePath` <[string]> Path to a Chromium or Chrome executable to run instead of the bundled Chromium. If `executablePath` is a relative path, then it is resolved relative to [current working directory](https://nodejs.org/api/process.html#process_process_cwd).
+  - `executablePath` <[string]> Path to a Chromium or Chrome executable to run instead of the bundled Chromium. If `executablePath` is a relative path, then it is resolved relative to [current working directory](https://nodejs.org/api/process.html#process_process_cwd). **BEWARE**: Puppeteer is only [guaranteed to work](https://github.com/GoogleChrome/puppeteer/#q-why-doesnt-puppeteer-vxxx-work-with-chromium-vyyy) with the bundled Chromium, use at your own risk.
   - `slowMo` <[number]> Slows down Puppeteer operations by the specified amount of milliseconds. Useful so that you can see what is going on.
   - `defaultViewport` <?[Object]> Sets a consistent viewport for each page. Defaults to an 800x600 viewport. `null` disables the default viewport.
     - `width` <[number]> page width in pixels.
@@ -444,13 +483,8 @@ The default flags that Chromium will be launched with.
   - `pipe` <[boolean]> Connects to the browser over a pipe instead of a WebSocket. Defaults to `false`.
 - returns: <[Promise]<[Browser]>> Promise which resolves to browser instance.
 
-The method combines 3 steps:
-1. Infer a set of flags to launch Chromium with using `puppeteer.defaultArgs()`.
-2. Launch a browser and start managing its process according to `executablePath`, `handleSIGINT`, `dumpio` and other options.
-3. Create an instance of [Browser] class and initialize it with regards to `defaultViewport`, `slowMo` and `ignoreHTTPSErrors`.
 
-`ignoreDefaultArgs` option can be used to customize behavior on the (1) step. For example, to filter out
-`--mute-audio` from default arguments:
+You can use `ignoreDefaultArgs` to filter out `--mute-audio` from default arguments:
 ```js
 const browser = await puppeteer.launch({
   ignoreDefaultArgs: ['--mute-audio']
@@ -608,6 +642,11 @@ const page = await context.newPage();
 await page.goto('https://example.com');
 ```
 
+#### browser.defaultBrowserContext()
+- returns: <[BrowserContext]>
+
+Returns the default browser context. The default browser context can not be closed.
+
 #### browser.disconnect()
 
 Disconnects Puppeteer from the browser, but leaves the Chromium process running. After calling `disconnect`, the [Browser] object is considered disposed and cannot be used anymore.
@@ -694,6 +733,18 @@ Emitted when a target inside the browser context is destroyed, for example when 
 
 The browser this browser context belongs to.
 
+#### browserContext.clearPermissionOverrides()
+- returns: <[Promise]>
+
+Clears all permission overrides for the browser context.
+
+```js
+const context = browser.defaultBrowserContext();
+context.overridePermissions('https://example.com', ['clipboard-read']);
+// do stuff ..
+context.clearPermissionOverrides();
+```
+
 #### browserContext.close()
 - returns: <[Promise]>
 
@@ -714,6 +765,35 @@ The default browser context is the only non-incognito browser context.
 - returns: <[Promise]<[Page]>>
 
 Creates a new page in the browser context.
+
+
+#### browserContext.overridePermissions(origin, permissions)
+- `origin` <[string]> The [origin] to grant permissions to, e.g. "https://example.com".
+- `permissions` <[Array]<[string]>> An array of permissions to grant. All permissions that are not listed here will be automatically denied. Permissions can be one of the following values:
+    - `'geolocation'`
+    - `'midi'`
+    - `'midi-sysex'` (system-exclusive midi)
+    - `'notifications'`
+    - `'push'`
+    - `'camera'`
+    - `'microphone'`
+    - `'background-sync'`
+    - `'ambient-light-sensor'`
+    - `'accelerometer'`
+    - `'gyroscope'`
+    - `'magnetometer'`
+    - `'accessibility-events'`
+    - `'clipboard-read'`
+    - `'clipboard-write'`
+    - `'payment-handler'`
+- returns: <[Promise]>
+
+
+```js
+const context = browser.defaultBrowserContext();
+await context.overridePermissions('https://html5demos.com', ['geolocation']);
+```
+
 
 #### browserContext.pages()
 - returns: <[Promise]<[Array]<[Page]>>> Promise which resolves to an array of all open pages. Non visible pages, such as `"background_page"`, will not be listed here. You can find them using [target.page()](#targetpage).
@@ -1264,6 +1344,7 @@ Navigate to the next page in history.
     - `domcontentloaded` - consider navigation to be finished when the `DOMContentLoaded` event is fired.
     - `networkidle0` - consider navigation to be finished when there are no more than 0 network connections for at least `500` ms.
     - `networkidle2` - consider navigation to be finished when there are no more than 2 network connections for at least `500` ms.
+  - `referer` <[string]> Referer header value. If provided it will take preference over the referer header value set by [page.setExtraHTTPHeaders()](#pagesetextrahttpheadersheaders).
 - returns: <[Promise]<?[Response]>> Promise which resolves to the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect.
 
 The `page.goto` will throw an error if:
@@ -1277,7 +1358,7 @@ The `page.goto` will throw an error if:
 > **NOTE** Headless mode doesn't match any nodest navigating to a PDF document. See the [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
 
 #### page.hover(selector)
-- `selector` <[string]> A [selector] to search for element to hover. If there are multiple elements satisfying the selector, tvailable via.
+- `selector` <[string]> A [selector] to search for element to hover. If there are multiple elements satisfying the selector, the first will be hovered.
 - returns: <[Promise]> Promise which resolves when the element matching `selector` is successfully hovered. Promise gets rejected if there's no element matching `selector`.
 
 This method fetches an element with `selector`, scrolls it into view if needed, and then uses [page.mouse](#pagemouse) to hover over the center of the element.
@@ -1325,7 +1406,7 @@ Page is guaranteed to have a main frame which persists during navigations.
 #### page.pdf(options)
 - `options` <[Object]> Options object which might have the following properties:
   - `path` <[string]> The file path to save the PDF to. If `path` is a relative path, then it is resolved relative to [current working directory](https://nodejs.org/api/process.html#process_process_cwd). If no path is provided, the PDF won't be saved to the disk.
-  - `scale` <[number]> Scale of the webpage rendering. Defaults to `1`.
+  - `scale` <[number]> Scale of the webpage rendering. Defaults to `1`. Scale amount must be between 0.1 and 2.
   - `displayHeaderFooter` <[boolean]> Display header and footer. Defaults to `false`.
   - `headerTemplate` <[string]> HTML template for the print header. Should be valid HTML markup with following classes used to inject printing values into them:
     - `date` formatted print date
@@ -1502,6 +1583,21 @@ This setting will change the default maximum navigation time of 30 seconds for t
 The extra HTTP headers will be sent with every request the page initiates.
 
 > **NOTE** page.setExtraHTTPHeaders does not guarantee the order of headers in the outgoing requests.
+
+#### page.setGeolocation(options)
+- `options`
+  - `latitude` <[number]> Latitude between -90 and 90.
+  - `longitude` <[number]> Longitude between -180 and 180.
+  - `accuracy` <[number]> Optional non-negative accuracy value.
+- returns: <[Promise]>
+
+Sets the page's geolocation.
+
+```js
+await page.setGeolocation({latitude: 59.95, longitude: 30.31667});
+```
+
+> **NOTE** Consider using [browserContext.overridePermissions](#browsercontextoverridepermissionsorigin-permissions) to grant permissions for the page to read its geolocation.
 
 #### page.setJavaScriptEnabled(enabled)
 - `enabled` <[boolean]> Whether or not to enable JavaScript on the page.
@@ -2972,6 +3068,11 @@ This method will throw if the response body is not parsable via `JSON.parse`.
 
 Contains a boolean stating whether the response was successful (status in the range 200-299) or not.
 
+#### response.remoteAddress()
+- returns: <[Object]>
+  - `ip` <[string]> the IP address of the remote server
+  - `port` <[number]> the port used to connect to the remote server
+
 #### response.request()
 - returns: <[Request]> A matching [Request] object.
 
@@ -2982,6 +3083,11 @@ Contains a boolean stating whether the response was successful (status in the ra
 - returns: <[number]>
 
 Contains the status code of the response (e.g., 200 for a success).
+
+#### response.statusText()
+- returns: <[string]>
+
+Contains the status text of the response (e.g. usually an "OK" for a success).
 
 #### response.text()
 - returns: <[Promise]<[string]>> Promise which resolves to a text representation of response body.
@@ -3161,6 +3267,7 @@ TimeoutError is emitted whenever certain operations are terminated due to timeou
 [function]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function "Function"
 [number]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#Number_type "Number"
 [Object]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object "Object"
+[origin]: https://developer.mozilla.org/en-US/docs/Glossary/Origin "Origin"
 [Page]: #class-page "Page"
 [Promise]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise "Promise"
 [string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#String_type "String"

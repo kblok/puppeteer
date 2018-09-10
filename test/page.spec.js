@@ -75,6 +75,83 @@ module.exports.addTests = function({testRunner, expect, headless}) {
     });
   });
 
+  describe('BrowserContext.overridePermissions', function() {
+    function getPermission(page, name) {
+      return page.evaluate(name => navigator.permissions.query({name}).then(result => result.state), name);
+    }
+
+    it('should be prompt by default', async({page, server, context}) => {
+      await page.goto(server.EMPTY_PAGE);
+      expect(await getPermission(page, 'geolocation')).toBe('prompt');
+    });
+    it('should deny permission when not listed', async({page, server, context}) => {
+      await page.goto(server.EMPTY_PAGE);
+      await context.overridePermissions(server.EMPTY_PAGE, []);
+      expect(await getPermission(page, 'geolocation')).toBe('denied');
+    });
+    it('should fail when bad permission is given', async({page, server, context}) => {
+      await page.goto(server.EMPTY_PAGE);
+      let error = null;
+      await context.overridePermissions(server.EMPTY_PAGE, ['foo']).catch(e => error = e);
+      expect(error.message).toBe('Unknown permission: foo');
+    });
+    it('should grant permission when listed', async({page, server, context}) => {
+      await page.goto(server.EMPTY_PAGE);
+      await context.overridePermissions(server.EMPTY_PAGE, ['geolocation']);
+      expect(await getPermission(page, 'geolocation')).toBe('granted');
+    });
+    it('should reset permissions', async({page, server, context}) => {
+      await page.goto(server.EMPTY_PAGE);
+      await context.overridePermissions(server.EMPTY_PAGE, ['geolocation']);
+      expect(await getPermission(page, 'geolocation')).toBe('granted');
+      await context.clearPermissionOverrides();
+      expect(await getPermission(page, 'geolocation')).toBe('prompt');
+    });
+    it('should trigger permission onchange', async({page, server, context}) => {
+      await page.goto(server.EMPTY_PAGE);
+      await page.evaluate(() => {
+        window.events = [];
+        return navigator.permissions.query({name: 'clipboard-read'}).then(function(result) {
+          window.events.push(result.state);
+          result.onchange = function() {
+            window.events.push(result.state);
+          };
+        });
+      });
+      expect(await page.evaluate(() => window.events)).toEqual(['prompt']);
+      await context.overridePermissions(server.EMPTY_PAGE, []);
+      expect(await page.evaluate(() => window.events)).toEqual(['prompt', 'denied']);
+      await context.overridePermissions(server.EMPTY_PAGE, ['clipboard-read']);
+      expect(await page.evaluate(() => window.events)).toEqual(['prompt', 'denied', 'granted']);
+      await context.clearPermissionOverrides();
+      expect(await page.evaluate(() => window.events)).toEqual(['prompt', 'denied', 'granted', 'prompt']);
+    });
+  });
+
+  describe('Page.setGeolocation', function() {
+    it('should work', async({page, server, context}) => {
+      await context.overridePermissions(server.PREFIX, ['geolocation']);
+      await page.goto(server.EMPTY_PAGE);
+      await page.setGeolocation({longitude: 10, latitude: 10});
+      const geolocation = await page.evaluate(() => new Promise(resolve => navigator.geolocation.getCurrentPosition(position => {
+        resolve({latitude: position.coords.latitude, longitude: position.coords.longitude});
+      })));
+      expect(geolocation).toEqual({
+        latitude: 10,
+        longitude: 10
+      });
+    });
+    it('should throw when invalid longitude', async({page, server, context}) => {
+      let error = null;
+      try {
+        await page.setGeolocation({longitude: 200, latitude: 10});
+      } catch (e) {
+        error = e;
+      }
+      expect(error.message).toContain('Invalid longitude "200"');
+    });
+  });
+
   describe('Page.evaluate', function() {
     it('should work', async({page, server}) => {
       const result = await page.evaluate(() => 7 * 3);
@@ -475,7 +552,7 @@ module.exports.addTests = function({testRunner, expect, headless}) {
       expect(response.status()).toBe(200);
       expect(response.securityDetails()).toBe(null);
     });
-    xit('should work when page calls history API in beforeunload', async({page, server}) => {
+    it('should work when page calls history API in beforeunload', async({page, server}) => {
       await page.goto(server.EMPTY_PAGE);
       await page.evaluate(() => {
         window.addEventListener('beforeunload', () => history.replaceState(null, 'initial', window.location.href), false);
@@ -676,6 +753,18 @@ module.exports.addTests = function({testRunner, expect, headless}) {
         error = e;
       }
       expect(error.message).toContain(url);
+    });
+    it('should send referer', async({page, server}) => {
+      const [request1, request2] = await Promise.all([
+        server.waitForRequest('/grid.html'),
+        server.waitForRequest('/digits/1.png'),
+        page.goto(server.PREFIX + '/grid.html', {
+          referer: 'http://google.com/',
+        }),
+      ]);
+      expect(request1.headers['referer']).toBe('http://google.com/');
+      // Make sure subresources do not inherit referer.
+      expect(request2.headers['referer']).toBe(server.PREFIX + '/grid.html');
     });
   });
 
@@ -913,6 +1002,15 @@ module.exports.addTests = function({testRunner, expect, headless}) {
         return await compute(9, 4);
       });
       expect(result).toBe(36);
+    });
+    it('should be callable from-inside evaluateOnNewDocument', async({page, server}) => {
+      let called = false;
+      await page.exposeFunction('woof', function() {
+        called = true;
+      });
+      await page.evaluateOnNewDocument(() => woof());
+      await page.reload();
+      expect(called).toBe(true);
     });
     it('should survive navigation', async({page, server}) => {
       await page.exposeFunction('compute', function(a, b) {
