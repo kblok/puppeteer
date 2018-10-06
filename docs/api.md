@@ -1,8 +1,9 @@
-# Puppeteer API <!-- GEN:version -->v1.8.0<!-- GEN:stop-->
+# Puppeteer API <!-- GEN:version -->v1.9.0<!-- GEN:stop-->
 
 <!-- GEN:empty-if-release --><!-- GEN:stop -->
 - API Translations: [中文|Chinese](https://zhaoqize.github.io/puppeteer-api-zh_CN/#/)
 - Releases per Chromium Version:
+  * Chromium 71.0.3542.0 - [Puppeteer v1.8.0](https://github.com/GoogleChrome/puppeteer/blob/v1.8.0/docs/api.md)
   * Chromium 70.0.3508.0 - [Puppeteer v1.7.0](https://github.com/GoogleChrome/puppeteer/blob/v1.7.0/docs/api.md)
   * Chromium 69.0.3494.0 - [Puppeteer v1.6.2](https://github.com/GoogleChrome/puppeteer/blob/v1.6.2/docs/api.md)
   * Chromium 68.0.3419.0 - [Puppeteer v1.4.0](https://github.com/GoogleChrome/puppeteer/blob/v1.4.0/docs/api.md)
@@ -45,6 +46,7 @@
   * [browser.newPage()](#browsernewpage)
   * [browser.pages()](#browserpages)
   * [browser.process()](#browserprocess)
+  * [browser.target()](#browsertarget)
   * [browser.targets()](#browsertargets)
   * [browser.userAgent()](#browseruseragent)
   * [browser.version()](#browserversion)
@@ -191,6 +193,7 @@
   * [frame.evaluateHandle(pageFunction, ...args)](#frameevaluatehandlepagefunction-args)
   * [frame.executionContext()](#frameexecutioncontext)
   * [frame.focus(selector)](#framefocusselector)
+  * [frame.goto(url, options)](#framegotourl-options)
   * [frame.hover(selector)](#framehoverselector)
   * [frame.isDetached()](#frameisdetached)
   * [frame.name()](#framename)
@@ -203,6 +206,7 @@
   * [frame.url()](#frameurl)
   * [frame.waitFor(selectorOrFunctionOrTimeout[, options[, ...args]])](#framewaitforselectororfunctionortimeout-options-args)
   * [frame.waitForFunction(pageFunction[, options[, ...args]])](#framewaitforfunctionpagefunction-options-args)
+  * [frame.waitForNavigation(options)](#framewaitfornavigationoptions)
   * [frame.waitForSelector(selector[, options])](#framewaitforselectorselector-options)
   * [frame.waitForXPath(xpath[, options])](#framewaitforxpathxpath-options)
 - [class: ExecutionContext](#class-executioncontext)
@@ -258,6 +262,7 @@
   * [request.url()](#requesturl)
 - [class: Response](#class-response)
   * [response.buffer()](#responsebuffer)
+  * [response.frame()](#responseframe)
   * [response.fromCache()](#responsefromcache)
   * [response.fromServiceWorker()](#responsefromserviceworker)
   * [response.headers()](#responseheaders)
@@ -335,6 +340,12 @@ In most cases, you'll be fine using the `puppeteer` package.
 However, you should use `puppeteer-core` if:
 - you're building another end-user product or library atop of DevTools protocol. For example, one might build PDF generator using `puppeteer-core` and write a custom `install.js` script that downloads [`headless_shell`](https://chromium.googlesource.com/chromium/src/+/lkgr/headless/README.md) instead of Chromium to save disk space.
 - you're bundling Puppeteer to use in Chrome Extension / browser with the DevTools protocol where downloading an additional Chromium binary is unnecessary.
+
+When using `puppeteer-core`, remember to change the *include* line:
+
+```js
+const puppeteer = require('puppeteer-core');
+```
 
 
 ### Environment Variables
@@ -665,6 +676,11 @@ the method will return an array with all the pages in all browser contexts.
 #### browser.process()
 - returns: <?[ChildProcess]> Spawned browser process. Returns `null` if the browser instance was created with [`puppeteer.connect`](#puppeteerconnectoptions) method.
 
+#### browser.target()
+- returns: <[Target]>
+
+A target associated with the browser.
+
 #### browser.targets()
 - returns: <[Array]<[Target]>>
 
@@ -945,7 +961,7 @@ Emitted when a dedicated [WebWorker](https://developer.mozilla.org/en-US/docs/We
 - `selector` <[string]> A [selector] to query page for
 - returns: <[Promise]<?[ElementHandle]>>
 
-The method runs `document.querySelector` within the page. If no element matches the selector, the return value resolve to `null`.
+The method runs `document.querySelector` within the page. If no element matches the selector, the return value resolves to `null`.
 
 Shortcut for [page.mainFrame().$(selector)](#frameselector).
 
@@ -953,7 +969,7 @@ Shortcut for [page.mainFrame().$(selector)](#frameselector).
 - `selector` <[string]> A [selector] to query page for
 - returns: <[Promise]<[Array]<[ElementHandle]>>>
 
-The method runs `document.querySelectorAll` within the page. If no elements match the selector, the return value resolve to `[]`.
+The method runs `document.querySelectorAll` within the page. If no elements match the selector, the return value resolves to `[]`.
 
 Shortcut for [page.mainFrame().$$(selector)](#frameselector-1).
 
@@ -1028,7 +1044,7 @@ Shortcut for [page.mainFrame().addStyleTag(options)](#frameaddstyletagoptions).
   - `password` <[string]>
 - returns: <[Promise]>
 
-Provide credentials for [http authentication](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication).
+Provide credentials for [HTTP authentication](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication).
 
 To disable authentication, pass `null`.
 
@@ -1355,14 +1371,16 @@ The `page.goto` will throw an error if:
 
 > **NOTE** `page.goto` either throw or return a main resource response. The only exceptions are navigation to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
 
-> **NOTE** Headless mode doesn't match any nodest navigating to a PDF document. See the [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
+> **NOTE** Headless mode doesn't support navigation to a PDF document. See the [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
+
+Shortcut for [page.mainFrame().goto(url, options)](#framegotourl-options)
 
 #### page.hover(selector)
 - `selector` <[string]> A [selector] to search for element to hover. If there are multiple elements satisfying the selector, the first will be hovered.
 - returns: <[Promise]> Promise which resolves when the element matching `selector` is successfully hovered. Promise gets rejected if there's no element matching `selector`.
 
 This method fetches an element with `selector`, scrolls it into view if needed, and then uses [page.mouse](#pagemouse) to hover over the center of the element.
-If a there's no element matching `selector`, the method throws an error.
+If there's no element matching `selector`, the method throws an error.
 
 Shortcut for [page.mainFrame().hover(selector)](#framehoverselector).
 
@@ -1566,6 +1584,10 @@ Toggles ignoring cache for each request based on the enabled state. By default, 
   - `sameSite` <[string]> `"Strict"` or `"Lax"`.
 - returns: <[Promise]>
 
+```js
+await page.setCookie(cookieObject1, cookieObject2);
+```
+
 #### page.setDefaultNavigationTimeout(timeout)
 - `timeout` <[number]> Maximum navigation time in milliseconds
 
@@ -1577,7 +1599,7 @@ This setting will change the default maximum navigation time of 30 seconds for t
 - [page.waitForNavigation(options)](#pagewaitfornavigationoptions)
 
 #### page.setExtraHTTPHeaders(headers)
-- `headers` <[Object]> An object containing additional http headers to be sent with every request. All header values must be strings.
+- `headers` <[Object]> An object containing additional HTTP headers to be sent with every request. All header values must be strings.
 - returns: <[Promise]>
 
 The extra HTTP headers will be sent with every request the page initiates.
@@ -1788,12 +1810,15 @@ This resolves when the page navigates to a new URL or reloads. It is useful for 
 which will indirectly cause the page to navigate. Consider this example:
 
 ```js
-const navigationPromise = page.waitForNavigation();
-await page.click('a.my-link'); // Clicking the link will indirectly cause a navigation
-await navigationPromise; // The navigationPromise resolves after navigation has finished
+const [response] = await Promise.all([
+  page.waitForNavigation(), // The promise resolves after navigation has finished
+  page.click('a.my-link'), // Clicking the link will indirectly cause a navigation
+]);
 ```
 
 **NOTE** Usage of the [History API](https://developer.mozilla.org/en-US/docs/Web/API/History_API) to change the URL is considered a navigation.
+
+Shortcut for [page.mainFrame().waitForNavigation(options)](#framewaitfornavigationoptions).
 
 #### page.waitForRequest(urlOrPredicate, options)
 - `urlOrPredicate` <[string]|[Function]> A URL or predicate to wait for.
@@ -2022,6 +2047,19 @@ Dispatches a `keyup` event.
 
 The Mouse class operates in main-frame CSS pixels relative to the top-left corner of the viewport.
 
+Every `page` object has it's own Mouse, accessible with [`page.mouse`](#pagemouse).
+
+```js
+// Using ‘page.mouse’ to trace a 100x100 square.
+await page.mouse.move(0, 0);
+await page.mouse.down();
+await page.mouse.move(0, 100);
+await page.mouse.move(100, 100);
+await page.mouse.move(100, 0);
+await page.mouse.move(0, 0);
+await page.mouse.up();
+```
+
 #### mouse.click(x, y, [options])
 - `x` <[number]>
 - `y` <[number]>
@@ -2167,6 +2205,14 @@ puppeteer.launch().then(async browser => {
 });
 ```
 
+An example of getting text from an iframe element:
+
+```js
+  const frame = page.frames().find(frame => frame.name() === 'myframe');
+  const text = await frame.$eval('.selector', element => element.textContent);
+  console.log(text);
+```
+
 #### frame.$(selector)
 - `selector` <[string]> A [selector] to query frame for
 - returns: <[Promise]<?[ElementHandle]>> Promise which resolves to ElementHandle pointing to the frame element.
@@ -2177,7 +2223,7 @@ The method queries frame for the selector. If there's no such element within the
 - `selector` <[string]> A [selector] to query frame for
 - returns: <[Promise]<[Array]<[ElementHandle]>>> Promise which resolves to ElementHandles pointing to the frame elements.
 
-The method runs `document.querySelectorAll` within the frame. If no elements match the selector, the return value resolve to `[]`.
+The method runs `document.querySelectorAll` within the frame. If no elements match the selector, the return value resolves to `[]`.
 
 #### frame.$$eval(selector, pageFunction[, ...args])
 - `selector` <[string]> A [selector] to query frame for
@@ -2334,6 +2380,29 @@ Returns promise that resolves to the frame's default execution context.
 This method fetches an element with `selector` and focuses it.
 If there's no element matching `selector`, the method throws an error.
 
+#### frame.goto(url, options)
+- `url` <[string]> URL to navigate frame to. The url should include scheme, e.g. `https://`.
+- `options` <[Object]> Navigation parameters which might have the following properties:
+  - `timeout` <[number]> Maximum navigation time in milliseconds, defaults to 30 seconds, pass `0` to disable timeout. The default value can be changed by using the [page.setDefaultNavigationTimeout(timeout)](#pagesetdefaultnavigationtimeouttimeout) method.
+  - `waitUntil` <[string]|[Array]<[string]>> When to consider navigation succeeded, defaults to `load`. Given an array of event strings, navigation is considered to be successful after all events have been fired. Events can be either:
+    - `load` - consider navigation to be finished when the `load` event is fired.
+    - `domcontentloaded` - consider navigation to be finished when the `DOMContentLoaded` event is fired.
+    - `networkidle0` - consider navigation to be finished when there are no more than 0 network connections for at least `500` ms.
+    - `networkidle2` - consider navigation to be finished when there are no more than 2 network connections for at least `500` ms.
+  - `referer` <[string]> Referer header value. If provided it will take preference over the referer header value set by [page.setExtraHTTPHeaders()](#pagesetextrahttpheadersheaders).
+- returns: <[Promise]<?[Response]>> Promise which resolves to the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect.
+
+The `frame.goto` will throw an error if:
+- there's an SSL error (e.g. in case of self-signed certificates).
+- target URL is invalid.
+- the `timeout` is exceeded during navigation.
+- the main resource failed to load.
+
+> **NOTE** `frame.goto` either throw or return a main resource response. The only exceptions are navigation to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
+
+> **NOTE** Headless mode doesn't support navigation to a PDF document. See the [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
+
+
 #### frame.hover(selector)
 - `selector` <[string]> A [selector] to search for element to hover. If there are multiple elements satisfying the selector, the first will be hovered.
 - returns: <[Promise]> Promise which resolves when the element matching `selector` is successfully hovered. Promise gets rejected if there's no element matching `selector`.
@@ -2464,6 +2533,29 @@ To pass arguments from node.js to the predicate of `page.waitForFunction` functi
 const selector = '.foo';
 await page.waitForFunction(selector => !!document.querySelector(selector), {}, selector);
 ```
+
+#### frame.waitForNavigation(options)
+- `options` <[Object]> Navigation parameters which might have the following properties:
+  - `timeout` <[number]> Maximum navigation time in milliseconds, defaults to 30 seconds, pass `0` to disable timeout. The default value can be changed by using the [page.setDefaultNavigationTimeout(timeout)](#pagesetdefaultnavigationtimeouttimeout) method.
+  - `waitUntil` <[string]|[Array]<[string]>> When to consider navigation succeeded, defaults to `load`. Given an array of event strings, navigation is considered to be successful after all events have been fired. Events can be either:
+    - `load` - consider navigation to be finished when the `load` event is fired.
+    - `domcontentloaded` - consider navigation to be finished when the `DOMContentLoaded` event is fired.
+    - `networkidle0` - consider navigation to be finished when there are no more than 0 network connections for at least `500` ms.
+    - `networkidle2` - consider navigation to be finished when there are no more than 2 network connections for at least `500` ms.
+- returns: <[Promise]<[?Response]>> Promise which resolves to the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect. In case of navigation to a different anchor or navigation due to History API usage, the navigation will resolve with `null`.
+
+This resolves when the frame navigates to a new URL. It is useful for when you run code
+which will indirectly cause the frame to navigate. Consider this example:
+
+```js
+const [response] = await Promise.all([
+  frame.waitForNavigation(), // The navigation promise resolves after navigation has finished
+  frame.click('a.my-link'), // Clicking the link will indirectly cause a navigation
+]);
+```
+
+**NOTE** Usage of the [History API](https://developer.mozilla.org/en-US/docs/Web/API/History_API) to change the URL is considered a navigation.
+
 
 #### frame.waitForSelector(selector[, options])
 - `selector` <[string]> A [selector] of an element to wait for
@@ -2696,13 +2788,13 @@ ElementHandle instances can be used as arguments in [`page.$eval()`](#pageevalse
 - `selector` <[string]> A [selector] to query element for
 - returns: <[Promise]<?[ElementHandle]>>
 
-The method runs `element.querySelector` within the page. If no element matches the selector, the return value resolve to `null`.
+The method runs `element.querySelector` within the page. If no element matches the selector, the return value resolves to `null`.
 
 #### elementHandle.$$(selector)
 - `selector` <[string]> A [selector] to query element for
 - returns: <[Promise]<[Array]<[ElementHandle]>>>
 
-The method runs `element.querySelectorAll` within the page. If no elements match the selector, the return value resolve to `[]`.
+The method runs `element.querySelectorAll` within the page. If no elements match the selector, the return value resolves to `[]`.
 
 #### elementHandle.$$eval(selector, pageFunction, ...args)
 - `selector` <[string]> A [selector] to query page for
@@ -2955,7 +3047,7 @@ page.on('requestfailed', request => {
 ```
 
 #### request.frame()
-- returns: <?[Frame]> A matching [Frame] object, or `null` if navigating to error pages.
+- returns: <?[Frame]> A [Frame] that initiated this request, or `null` if navigating to error pages.
 
 #### request.headers()
 - returns: <[Object]> An object with HTTP headers associated with the request. All header names are lower-case.
@@ -3045,6 +3137,9 @@ page.on('request', request => {
 #### response.buffer()
 - returns: <Promise<[Buffer]>> Promise which resolves to a buffer with response body.
 
+#### response.frame()
+- returns: <?[Frame]> A [Frame] that initiated this response, or `null` if navigating to error pages.
+
 #### response.fromCache()
 - returns: <[boolean]>
 
@@ -3099,7 +3194,7 @@ Contains the URL of the response.
 
 ### class: SecurityDetails
 
-[SecurityDetails] class represents responses which are received by page.
+[SecurityDetails] class represents the security details when response was received over the secure connection.
 
 #### securityDetails.issuer()
 - returns: <[string]> A string with the name of issuer of the certificate.
